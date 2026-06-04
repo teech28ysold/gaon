@@ -7,24 +7,7 @@ import 'package:http_parser/http_parser.dart';
 class ApiService {
   // FastAPI 서버 주소
   static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:8000';
-    }
-    try {
-      if (Platform.isAndroid) {
-        // [선택 1] 에뮬레이터 개발 환경 기본 주소
-        // return 'http://10.0.2.2:8000';
-
-        // [선택 2] 실기기 USB 연결 + adb reverse 명령 실행 시 주소
-        // return 'http://127.0.0.1:8000';
-
-        // [선택 3] 컴퓨터와 폰이 같은 와이파이(Wi-Fi)에 연결된 경우의 컴퓨터 IP 주소
-        return 'http://10.130.20.86:8000';
-      }
-    } catch (_) {
-      // Platform 사용 불가 플랫폼(웹 등) 예외 처리
-    }
-    return 'http://localhost:8000';
+    return 'https://gaon-l0t5.onrender.com';
   }
 
   // 1. 대화 내역 가져오기
