@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geolocator/geolocator.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
 
@@ -59,6 +61,58 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _picker = ImagePicker();
+
+  // 4대 관심사 및 단축 질문 정의
+  final List<Map<String, dynamic>> _shortcutCategories = [
+    {
+      'title': '🩺 건강 정보',
+      'icon': Icons.medical_services_rounded,
+      'color': const Color(0xFFE11D48),
+      'bgColor': const Color(0xFFFFF1F2),
+      'questions': [
+        '고혈압 예방에 좋은 음식과 식습관 알려줘 😊',
+        '무릎 관절통을 줄여주는 무리 없는 스트레칭 알려줘 🩺',
+        '치매 예방을 위해 매일 쉽게 할 수 있는 뇌 운동 알려줘 🧠',
+        '나이가 들면서 생기는 불면증 극복 방법 알려줘 💤',
+      ]
+    },
+    {
+      'title': '🍳 소화 잘되는 요리',
+      'icon': Icons.restaurant_rounded,
+      'color': const Color(0xFFD97706),
+      'bgColor': const Color(0xFFFEF3C7),
+      'questions': [
+        '소화가 아주 잘되는 어르신 아침 죽 만드는 법 알려줘 🍳',
+        '단백질이 가득해 뼈에 좋은 맛있는 두부 반찬 요리법 알려줘 🥘',
+        '당뇨 환자도 맛있게 먹을 수 있는 저염식 나물 무침 알려줘 🥗',
+        '기력 회복에 도움되는 초간단 삼계탕 끓이는 법 알려줘 🍲',
+      ]
+    },
+    {
+      'title': '⛰️ 추천 등산 코스',
+      'icon': Icons.terrain_rounded,
+      'color': const Color(0xFF059669),
+      'bgColor': const Color(0xFFECFDF5),
+      'questions': [
+        '초보자도 무릎 아프지 않게 걷기 좋은 평탄한 둘레길 추천해줘 🚶‍♂️',
+        '관절 무리 없이 상쾌하게 다녀올 수 있는 완만한 등산로 추천해줘 ⛰',
+        '어르신들이 주말에 바람 쐬기 좋은 예쁜 생태 공원 알려줘 🌸',
+        '피톤치드 마시며 힐링할 수 있는 전국 유명 숲길 알려줘 🌲',
+      ]
+    },
+    {
+      'title': '🌸 재미와 소식',
+      'icon': Icons.emoji_emotions_rounded,
+      'color': const Color(0xFF2563EB),
+      'bgColor': const Color(0xFFEFF6FF),
+      'questions': [
+        '오늘 뇌 운동에 도움되는 재치 만점 퀴즈 하나 내줘 🧠',
+        '마음이 차분해지는 따뜻한 시 한 편 다정하게 읽어줘 📝',
+        '요즘 60~70대 친구들이 가장 선호하는 유익한 취미 생활 추천해줘 🎨',
+        '은퇴 후에 나라에서 받을 수 있는 소소한 혜택이나 복지 정보 알려줘 🎁',
+      ]
+    },
+  ];
 
   // 5. 카메라 이미지 촬영 및 서버 전송 로직
   Future<void> _pickAndSendImage() async {
@@ -117,8 +171,21 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _loadGuardianNumber();
     _loadHistory();
     _scheduleDailyReminders();
+  }
+
+  // 보호자 번호 기기 로드
+  Future<void> _loadGuardianNumber() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _guardianNumber = prefs.getString('guardian_number') ?? '';
+      });
+    } catch (e) {
+      debugPrint("보호자 번호 로드 에러: $e");
+    }
   }
 
   // 1. 이전 대화 내역 조회
@@ -152,12 +219,38 @@ class _ChatScreenState extends State<ChatScreen> {
     return regExp.hasMatch(text);
   }
 
+  // GPS 좌표 실시간 획득 헬퍼
+  Future<Position?> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return null;
+      }
+      
+      if (permission == LocationPermission.deniedForever) return null;
+
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      debugPrint("위치 정보 획득 실패: $e");
+      return null;
+    }
+  }
+
   // 2. 메시지 전송
-  Future<void> _sendMessage() async {
-    final text = _textController.text.trim();
+  Future<void> _sendMessage({String? customText}) async {
+    final text = customText ?? _textController.text.trim();
     if (text.isEmpty) return;
 
-    _textController.clear();
+    if (customText == null) {
+      _textController.clear();
+    }
     
     // UI에 사용자 메시지 선배치 (빠른 반응성 제공)
     final tempUserMessage = {
@@ -179,8 +272,26 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
+    // 위치 관련 단어가 들어가거나 주변 시설 조회를 원할 때만 GPS 정보 로드
+    Position? pos;
+    final bool isLocationQuery = text.contains("주변") || 
+                                 text.contains("근처") || 
+                                 text.contains("병원") || 
+                                 text.contains("약국") || 
+                                 text.contains("날씨") || 
+                                 text.contains("등산") || 
+                                 text.contains("맛집") || 
+                                 text.contains("위치");
+    if (isLocationQuery) {
+      pos = await _getCurrentLocation();
+    }
+
     try {
-      final response = await ApiService.sendChatMessage(text);
+      final response = await ApiService.sendChatMessage(
+        text,
+        latitude: pos?.latitude,
+        longitude: pos?.longitude,
+      );
       if (response['status'] == 'success') {
         setState(() {
           // 임시 사용자 메시지를 실제 DB 저장 완료된 메시지로 대체
@@ -396,6 +507,8 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          // 보호자 연락처 항시 표시 바
+          _buildGuardianBanner(),
           // 채팅 메시지 영역
           Expanded(
             child: _isLoading
@@ -444,73 +557,380 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 환영 웰컴 스크린
-  Widget _buildWelcomeWidget() {
-    return Center(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(13),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  )
-                ]
-              ),
-              child: const Icon(
-                Icons.support_agent_rounded,
-                size: 72,
-                color: Color(0xFF0F5A5C),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              "반갑습니다, 아버님 어머님!",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E272E)),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              "가온 비서에게 궁금한 것을\n편하게 말씀해 주세요.\n\n🎙️ 마이크를 눌러 말씀하시거나\n📷 카메라로 약 봉투나 처방전을 찍어\n쉽게 물어보실 수 있습니다.",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18, 
-                color: Colors.blueGrey, 
-                height: 1.6,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 30),
-            _buildTipCard("💡 가온 비서 활용 꿀팁", "오늘 날씨 어때? 혹은 마트 갈 때 뭐 사야 하지? 라고 질문해 보세요!"),
-          ],
+  // 보호자 등록 상태 배너
+  Widget _buildGuardianBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: _guardianNumber.isEmpty ? const Color(0xFFFEE2E2) : const Color(0xFFECFDF5),
+        border: Border(
+          bottom: BorderSide(
+            color: _guardianNumber.isEmpty ? const Color(0xFFFCA5A5) : const Color(0xFFA7F3D0),
+            width: 1,
+          ),
         ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Icon(
+                  _guardianNumber.isEmpty ? Icons.warning_amber_rounded : Icons.verified_user_rounded,
+                  color: _guardianNumber.isEmpty ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _guardianNumber.isEmpty
+                        ? "안심 문자를 받을 보호자 번호가 등록되지 않았습니다."
+                        : "보호자 연락처: $_guardianNumber 🛡️",
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: _guardianNumber.isEmpty ? const Color(0xFF991B1B) : const Color(0xFF14532D),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _guardianNumber.isEmpty ? const Color(0xFFEF4444) : const Color(0xFF28B59E),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: _showGuardianRegisterDialog,
+            child: Text(
+              _guardianNumber.isEmpty ? "등록" : "변경",
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTipCard(String title, String content) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE6F3F3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFBBE0E0)),
-      ),
+  // 환영 웰컴 스크린 (시니어 대시보드 구조)
+  Widget _buildWelcomeWidget() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F5A5C))),
+          // 로고 영역 (더 심플하고 고급스럽게)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F5A5C).withAlpha(12),
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                )
+              ]
+            ),
+            child: const Icon(
+              Icons.support_agent_rounded,
+              size: 56,
+              color: Color(0xFF0F5A5C),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "반갑습니다, 아버님 어머님! 🌸",
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E272E),
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(content, style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.4)),
+          const Text(
+            "말씀하시기 편하도록 자주 찾는 질문들을 모아두었어요.\n아래 카테고리 중 하나를 눌러 편하게 질문해 보세요! 😊",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16.5,
+              color: Colors.blueGrey,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // 카테고리 대형 버튼 그리드
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: 1.15,
+            ),
+            itemCount: _shortcutCategories.length,
+            itemBuilder: (context, index) {
+              final cat = _shortcutCategories[index];
+              return InkWell(
+                onTap: () => _showShortcutQuestions(cat),
+                borderRadius: BorderRadius.circular(18),
+                child: Ink(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cat['bgColor'],
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: cat['color'].withAlpha(40), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: cat['color'].withAlpha(10),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(cat['icon'], size: 38, color: cat['color']),
+                      const SizedBox(height: 12),
+                      Text(
+                        cat['title'],
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E272E),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          
+          // 자녀 안심 알림 퀵 카드
+          InkWell(
+            onTap: _sendGuardianSafetyAlert,
+            borderRadius: BorderRadius.circular(18),
+            child: Ink(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFBBF7D0), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withAlpha(10),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.mail_outline_rounded, size: 36, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          "✉️ 자녀에게 안심 안부 보내기",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          "부모님이 잘 계신다는 문자를 자녀분께 보내드립니다.",
+                          style: TextStyle(fontSize: 14.5, color: Colors.blueGrey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF16A34A)),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  // 단축 질문 목록 바텀 시트 열기
+  void _showShortcutQuestions(Map<String, dynamic> category) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(category['icon'], color: category['color'], size: 30),
+                    const SizedBox(width: 8),
+                    Text(
+                      "${category['title']} 추천 질문",
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E272E)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "가온 비서에게 물어보고 싶은 문장을 터치해 보세요.",
+                  style: TextStyle(fontSize: 15.5, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: (category['questions'] as List).length,
+                    itemBuilder: (context, index) {
+                      final question = category['questions'][index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF1E272E),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            side: BorderSide(color: category['color'].withAlpha(60), width: 1.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            alignment: Alignment.centerLeft,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _textController.text = question;
+                            _sendMessage();
+                          },
+                          child: Text(
+                            question,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 자녀 안심 안부 알림 전송 모의 처리
+  void _sendGuardianSafetyAlert() {
+    if (_guardianNumber.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: const [
+                Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text("보호자 등록 필요", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            content: const Text(
+              "등록된 보호자(자녀) 번호가 없습니다.\n먼저 자녀분의 번호를 등록해 주세요.",
+              style: TextStyle(fontSize: 17, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("닫기", style: TextStyle(fontSize: 18, color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F5A5C),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showGuardianRegisterDialog();
+                },
+                child: const Text("등록하기", style: TextStyle(fontSize: 18)),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.mark_email_read_rounded, color: Color(0xFF16A34A), size: 28),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text("안심 안부 문자 전송", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          content: Text(
+            "보호자 연락처 $_guardianNumber 로 아래 안심 문자를 전송하시겠습니까?\n\n\"[가온 안심알림] 부모님께서 가온 비서를 사용 중이시며, 현재 건강하게 잘 계신다고 안부를 전하셨습니다. 😊\"",
+            style: const TextStyle(fontSize: 17, height: 1.5, color: Colors.black87),
+          ),
+          actionsOverflowDirection: VerticalDirection.down,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("취소", style: TextStyle(fontSize: 18, color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                _showGuardianSmsAlert("부모님 안심 안부 전송");
+              },
+              child: const Text("보내기", style: TextStyle(fontSize: 18)),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -747,7 +1167,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 카카오톡 스타일 말풍선
+  // 카카오톡 스타일 말풍선 (가독성 극대화 및 깔끔한 대형 텍스트)
   Widget _buildChatBubble({
     required String message,
     required bool isUser,
@@ -757,21 +1177,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (isUser) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
               formattedTime,
-              style: const TextStyle(fontSize: 13, color: Colors.black38),
+              style: const TextStyle(fontSize: 14, color: Colors.black45),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Flexible(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFFEEA9), // 아늑하고 눈이 편안한 파스텔 옐로우 (가독성 극대화)
+                  color: Color(0xFFFEF3C7), // 아늑하고 높은 대비의 소프트 옐로우
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(18),
                     bottomLeft: Radius.circular(18),
@@ -781,7 +1201,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black12,
-                      blurRadius: 3,
+                      blurRadius: 4,
                       offset: Offset(1, 2),
                     )
                   ]
@@ -789,10 +1209,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: SelectableText(
                   message,
                   style: const TextStyle(
-                    fontSize: 19.2, // 기존 16px의 1.2배인 19.2px 설정 (시니어 가독성)
-                    color: Color(0xFF2C3E50),
-                    height: 1.4,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 21.0, // 시니어 가독성을 위한 대형 글씨 (21px)
+                    color: Color(0xFF1F2937),
+                    height: 1.5,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -802,32 +1222,32 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     } else {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 가온 프로필 아바타
             CircleAvatar(
               backgroundColor: const Color(0xFF0F5A5C),
-              radius: 22,
-              child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 24),
+              radius: 24,
+              child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 28),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     "가온 비서",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: const BorderRadius.only(
@@ -839,7 +1259,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withAlpha(15),
-                              blurRadius: 4,
+                              blurRadius: 5,
                               offset: const Offset(0, 2),
                             )
                           ]
@@ -847,28 +1267,28 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: SelectableText(
                           message,
                           style: const TextStyle(
-                            fontSize: 19.2, // 기존 16px의 1.2배인 19.2px 설정 (시니어 가독성)
-                            color: Color(0xFF1E272E),
-                            height: 1.4,
+                            fontSize: 21.0, // 시니어 가독성을 위한 대형 글씨 (21px)
+                            color: Color(0xFF111827),
+                            height: 1.5,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // TTS 재생 아이콘 버튼
                           IconButton(
-                            icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF28B59E), size: 22),
+                            icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF28B59E), size: 26),
                             padding: const EdgeInsets.all(4),
                             constraints: const BoxConstraints(),
                             onPressed: () => _playSimulatedTts(message),
                             tooltip: "음성으로 듣기",
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 10),
                           Text(
                             formattedTime,
-                            style: const TextStyle(fontSize: 13, color: Colors.black38),
+                            style: const TextStyle(fontSize: 14, color: Colors.black45),
                           ),
                         ],
                       ),
@@ -883,10 +1303,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // 화면 하단 싱글 UI 바
+  // 화면 하단 싱글 UI 바 (대비 개선 및 글씨 확대)
   Widget _buildBottomInputBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.only(
@@ -904,23 +1324,23 @@ class _ChatScreenState extends State<ChatScreen> {
       child: SafeArea(
         child: Row(
           children: [
-            // 1. 카메라 버튼 (실제 에뮬레이터/스마트폰 카메라 호출)
+            // 1. 카메라 버튼
             _buildCircularIconButton(
               icon: Icons.camera_alt_rounded,
-              color: const Color(0xFF0F5A5C), // 활성 컬러
+              color: const Color(0xFF0F5A5C),
               tooltip: "카메라 찍기",
               onPressed: _pickAndSendImage,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             
             // 2. 마이크 버튼
             _buildCircularIconButton(
               icon: Icons.mic_rounded,
-              color: const Color(0xFF0F5A5C), // 포인트 브랜드 컬러 (마이크 강조)
+              color: const Color(0xFF0F5A5C),
               tooltip: "목소리로 말하기",
               onPressed: _showVoiceDialog,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             
             // 3. 텍스트 입력창
             Expanded(
@@ -928,15 +1348,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.5),
                 ),
                 child: TextField(
                   controller: _textController,
-                  style: const TextStyle(fontSize: 18),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   decoration: const InputDecoration(
                     hintText: "가온에게 물어보세요...",
-                    hintStyle: TextStyle(fontSize: 18, color: Colors.black38),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    hintStyle: TextStyle(fontSize: 20, color: Colors.black45),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                     border: InputBorder.none,
                     isDense: true,
                   ),
@@ -944,14 +1364,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             
             // 4. 전송 버튼
             _buildCircularIconButton(
               icon: Icons.send_rounded,
               color: const Color(0xFF0F5A5C),
               tooltip: "보내기",
-              onPressed: _sendMessage,
+              onPressed: () => _sendMessage(),
             ),
           ],
         ),
@@ -970,12 +1390,12 @@ class _ChatScreenState extends State<ChatScreen> {
       color: Colors.transparent,
       child: Tooltip(
         message: tooltip,
-        textStyle: const TextStyle(fontSize: 15, color: Colors.white),
+        textStyle: const TextStyle(fontSize: 16, color: Colors.white),
         child: InkWell(
           onTap: onPressed,
           customBorder: const CircleBorder(),
           child: Ink(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: color.withAlpha(31),
               shape: BoxShape.circle,
@@ -983,7 +1403,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Icon(
               icon,
               color: color,
-              size: 26,
+              size: 28,
             ),
           ),
         ),
@@ -991,7 +1411,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 5단계: 보호자 자녀 번호 등록 대화상자
+  // 5단계: 보호자 자녀 번호 등록 대화상자 (SharedPreferences 저장 연동)
   void _showGuardianRegisterDialog() {
     final controller = TextEditingController(text: _guardianNumber);
     showDialog(
@@ -1020,7 +1440,7 @@ class _ChatScreenState extends State<ChatScreen> {
               TextField(
                 controller: controller,
                 keyboardType: TextInputType.phone,
-                style: const TextStyle(fontSize: 20),
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 decoration: const InputDecoration(
                   labelText: "보호자 전화번호",
                   labelStyle: TextStyle(fontSize: 16),
@@ -1043,22 +1463,31 @@ class _ChatScreenState extends State<ChatScreen> {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: () {
-                setState(() {
-                  _guardianNumber = controller.text.trim();
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      _guardianNumber.isEmpty
-                          ? "보호자 등록이 해제되었습니다."
-                          : "보호자 번호가 등록되었습니다: $_guardianNumber",
-                      style: const TextStyle(fontSize: 18),
+              onPressed: () async {
+                final inputNumber = controller.text.trim();
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('guardian_number', inputNumber);
+                  setState(() {
+                    _guardianNumber = inputNumber;
+                  });
+                } catch (e) {
+                  debugPrint("보호자 번호 저장 실패: $e");
+                }
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _guardianNumber.isEmpty
+                            ? "보호자 등록이 해제되었습니다."
+                            : "보호자 번호가 등록되었습니다: $_guardianNumber",
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                      backgroundColor: const Color(0xFF0F5A5C),
                     ),
-                    backgroundColor: const Color(0xFF0F5A5C),
-                  ),
-                );
+                  );
+                }
               },
               child: const Text("저장하기", style: TextStyle(fontSize: 18)),
             ),
@@ -1188,44 +1617,112 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // 5단계: 시니어용 단축 질문 행 위젯
+  // 시니어용 단축 질문 바 (깔끔한 2버튼 형태로 화면 간소화)
   Widget _buildQuickActionsRow() {
-    final actions = [
-      {'label': '☀️ 오늘 날씨 어때?', 'query': '오늘 날씨 어때?'},
-      {'label': '💊 아침 약 복용 확인', 'query': '오늘 아침 약 먹은 기록 확인해줘'},
-      {'label': '🩺 오늘의 건강 상식', 'query': '오늘의 건강 상식이나 유익한 팁 알려줘'},
-      {'label': '⏰ 1분 뒤 물 마실 알람', 'query': '1분 뒤에 물 마시기 알람 등록해줘'},
-    ];
     return Container(
-      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: const Color(0xFFF0F4F4),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: actions.length,
-        itemBuilder: (context, index) {
-          final action = actions[index];
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ActionChip(
-              label: Text(
-                action['label']!,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F5A5C),
-                ),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F5A5C),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFBBE0E0), width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               onPressed: () {
-                _textController.text = action['query']!;
-                _sendMessage();
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                    ),
+                  ),
+                  builder: (context) => SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            "🌟 가온 추천 질문 테마",
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E272E)),
+                          ),
+                          const SizedBox(height: 16),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 1.25,
+                            ),
+                            itemCount: _shortcutCategories.length,
+                            itemBuilder: (context, index) {
+                              final cat = _shortcutCategories[index];
+                              return InkWell(
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _showShortcutQuestions(cat);
+                                },
+                                borderRadius: BorderRadius.circular(14),
+                                child: Ink(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: cat['bgColor'],
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: cat['color'].withAlpha(40), width: 1.5),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(cat['icon'], size: 30, color: cat['color']),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        cat['title'],
+                                        style: const TextStyle(
+                                          fontSize: 16.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1E272E),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
               },
+              icon: const Icon(Icons.stars_rounded, size: 22),
+              label: const Text("가온 추천 질문 🌟", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             ),
-          );
-        },
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _sendGuardianSafetyAlert,
+              icon: const Icon(Icons.mail_rounded, size: 22),
+              label: const Text("자녀 안심 문자 ✉️", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1462,7 +1959,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       
                       const Text(
                         "💡 자주 하시는 질문을 바로 선택하셔도 좋습니다:",
-                        style: TextStyle(fontSize: 15, color: Colors.black54),
+                        style: TextStyle(fontSize: 16, color: Colors.black54),
                       ),
                       const SizedBox(height: 10),
                       Wrap(
@@ -1471,7 +1968,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         alignment: WrapAlignment.center,
                         children: [
                           ActionChip(
-                            label: const Text("☀️ 오늘 날씨 어때?", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            label: const Text("☀️ 오늘 날씨 어때?", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                             backgroundColor: Colors.white,
                             onPressed: () {
                               if (_isListening) _speech.stop();
@@ -1481,7 +1978,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             },
                           ),
                           ActionChip(
-                            label: const Text("💊 아침 약 복용 확인", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            label: const Text("💊 아침 약 복용 확인", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                             backgroundColor: Colors.white,
                             onPressed: () {
                               if (_isListening) _speech.stop();
@@ -1491,7 +1988,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             },
                           ),
                           ActionChip(
-                            label: const Text("⏰ 1분 뒤 약먹기 알람", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            label: const Text("⏰ 1분 뒤 약먹기 알람", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                             backgroundColor: Colors.white,
                             onPressed: () {
                               if (_isListening) _speech.stop();

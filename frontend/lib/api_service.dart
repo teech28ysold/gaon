@@ -26,12 +26,22 @@ class ApiService {
   }
 
   // 2. 메시지 전송 및 가온 AI 응답 획득
-  static Future<Map<String, dynamic>> sendChatMessage(String message) async {
+  static Future<Map<String, dynamic>> sendChatMessage(
+    String message, {
+    double? latitude,
+    double? longitude,
+  }) async {
     try {
+      final bodyMap = {
+        'message': message,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+      };
+      
       final response = await http.post(
         Uri.parse('$baseUrl/api/chat'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'message': message}),
+        body: json.encode(bodyMap),
       );
       
       if (response.statusCode == 200) {

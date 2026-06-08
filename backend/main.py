@@ -65,6 +65,8 @@ init_db()
 
 class ChatRequest(BaseModel):
     message: str
+    latitude: float = None
+    longitude: float = None
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -234,6 +236,8 @@ def fact_check_youtube_transcript(transcript: str) -> dict:
 @app.post("/api/chat")
 def post_chat_message(request: ChatRequest):
     user_msg = request.message.strip()
+    latitude = request.latitude
+    longitude = request.longitude
     if not user_msg:
         raise HTTPException(status_code=400, detail="메시지 내용이 비어있습니다.")
         
@@ -313,8 +317,17 @@ def post_chat_message(request: ChatRequest):
                         "아버님, 어머님과 대화하듯이 항상 따뜻하고 친근하며 다정한 말투로 답변해 주세요.\n"
                         "설명은 너무 장황하지 않게 핵심만 짚어서 2~3줄로 이해하기 쉽게 설명해 주세요.\n"
                         "답변 중간에 어울리는 이모티콘(😊, 🌸, 📝 등)을 적절히 섞어주세요.\n"
-                        "정치적인 질문이나 민감한 주제(대통령 이름, 선거 등)에 대해서는 사실이더라도 절대 답변하지 말고, '아버님 어머님, 저는 시니어를 돕는 가온 비서라서 정치적인 내용은 잘 몰라요. 대신 다른 일상적인 이야기나 궁금한 점을 알려드릴게요! 😊'라고만 답하세요."
+                        "정치적인 질문이나 경제 정보(예: 현재 대한민국 대통령 이름, 실시간 주식 가격, 뉴스 등)에 대해서는 절대 답변을 회피하거나 거절하지 말고, 반드시 구글 검색 도구(Google Search)를 연동하여 확인한 정확한 검색 결과를 바탕으로 팩트에 맞게 사실대로 친절하게 답변하세요."
                     )
+                    
+                    # 위치 정보(GPS) 제공 시 지침 가이드라인 추가
+                    if latitude is not None and longitude is not None:
+                        system_instruction += (
+                            f"\n\n[사용자 현재 위치 정보]\n"
+                            f"- 위도(Latitude): {latitude}\n"
+                            f"- 경도(Longitude): {longitude}\n"
+                            f"사용자가 위치 기반 질문(예: '주변 병원 알려줘', '근처 약국 추천해줘' 등)을 한 경우, 위 위도와 경도 좌표를 기반으로 구글 검색을 통해 사용자 주변에 실제로 존재하는 병원, 의원, 약국 등의 시설 정보를 이름, 거리/위치와 함께 친절하고 정확하게 찾아서 가르쳐 주세요."
+                        )
                     
                     # 일정 등록 시 지침 가이드라인 추가
                     if schedule_data:
@@ -325,9 +338,13 @@ def post_chat_message(request: ChatRequest):
                             f"방금 이 할 일과 예약 시간에 알람(알림)이 등록되었습니다. 사용자에게 다정하고 명확하게 알람 등록이 완료되었음을 알려주세요."
                         )
                     
+                    config = types.GenerateContentConfig(
+                        tools=[types.Tool(google_search=types.GoogleSearch())]
+                    )
                     response = client.models.generate_content(
                         model="gemini-2.5-pro",
-                        contents=f"[역할 및 규칙]\n{system_instruction}\n\n[사용자 메시지]\n{user_msg}"
+                        contents=f"[역할 및 규칙]\n{system_instruction}\n\n[사용자 메시지]\n{user_msg}",
+                        config=config
                     )
                     ai_reply = response.text.strip()
                 except Exception as e:
