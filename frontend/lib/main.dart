@@ -53,6 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   bool _isAnalyzingYoutube = false;
   List<String> _guardianNumbers = [];
+  String? _currentlySpeakingText;
   final FlutterTts _flutterTts = FlutterTts();
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
@@ -174,6 +175,37 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadGuardianNumbers();
     _loadHistory();
     _scheduleDailyReminders();
+    
+    // TTS 재생 완료/취소/에러 핸들러 설정
+    _flutterTts.setCompletionHandler(() {
+      if (mounted) {
+        setState(() {
+          _currentlySpeakingText = null;
+        });
+      }
+    });
+    _flutterTts.setCancelHandler(() {
+      if (mounted) {
+        setState(() {
+          _currentlySpeakingText = null;
+        });
+      }
+    });
+    _flutterTts.setErrorHandler((msg) {
+      if (mounted) {
+        setState(() {
+          _currentlySpeakingText = null;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _flutterTts.stop();
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   // 보호자 번호 기기 로드 (마이그레이션 지원)
@@ -1305,14 +1337,22 @@ class _ChatScreenState extends State<ChatScreen> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // TTS 재생 아이콘 버튼
-                          IconButton(
-                            icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF28B59E), size: 26),
-                            padding: const EdgeInsets.all(4),
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _playSimulatedTts(message),
-                            tooltip: "음성으로 듣기",
-                          ),
+                          // TTS 재생/중지 아이콘 버튼
+                          _currentlySpeakingText == message
+                              ? IconButton(
+                                  icon: const Icon(Icons.stop_circle_rounded, color: Colors.redAccent, size: 28),
+                                  padding: const EdgeInsets.all(4),
+                                  constraints: const BoxConstraints(),
+                                  onPressed: _stopTts,
+                                  tooltip: "읽기 중지",
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF28B59E), size: 26),
+                                  padding: const EdgeInsets.all(4),
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => _playSimulatedTts(message),
+                                  tooltip: "음성으로 듣기",
+                                ),
                           const SizedBox(width: 10),
                           Text(
                             formattedTime,
@@ -1665,6 +1705,8 @@ class _ChatScreenState extends State<ChatScreen> {
   // 5단계: 가온이의 말 대리 읽기 시뮬레이션 ➡️ 실제 TTS 음성 출력으로 변경!
   void _playSimulatedTts(String text) async {
     try {
+      await _flutterTts.stop(); // 먼저 재생 중인 것 중지
+
       await _flutterTts.setLanguage("ko-KR");
       await _flutterTts.setSpeechRate(0.5); // 시니어가 듣기 편하도록 속도를 약간 천천히 설정 (기본값 0.5가 적당)
       await _flutterTts.setPitch(1.0); // 표준 피치
@@ -1682,6 +1724,10 @@ class _ChatScreenState extends State<ChatScreen> {
         } catch (_) {}
       }
       
+      setState(() {
+        _currentlySpeakingText = text;
+      });
+
       await _flutterTts.speak(speakText);
       
       if (!mounted) return;
@@ -1689,23 +1735,65 @@ class _ChatScreenState extends State<ChatScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
-            children: const [
-              Icon(Icons.volume_up_rounded, color: Colors.white, size: 28),
-              SizedBox(width: 12),
-              Expanded(
+            children: [
+              const Icon(Icons.volume_up_rounded, color: Colors.white, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
                 child: Text(
                   "🔊 가온이가 다정한 목소리로 읽어 드리고 있습니다... 🎧",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
+              TextButton(
+                onPressed: () {
+                  _stopTts();
+                },
+                child: const Text(
+                  "중지",
+                  style: TextStyle(fontSize: 18, color: Colors.yellowAccent, fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
           backgroundColor: const Color(0xFF28B59E),
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 15), // 넉넉하게 재생시간 보장
         ),
       );
     } catch (e) {
       debugPrint("TTS 재생 실패: $e");
+    }
+  }
+
+  // TTS 읽기 중지 함수
+  void _stopTts() async {
+    try {
+      await _flutterTts.stop();
+      if (mounted) {
+        setState(() {
+          _currentlySpeakingText = null;
+        });
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.volume_off_rounded, color: Colors.white, size: 28),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    "🔇 음성 읽기를 중지했습니다.",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("TTS 중지 실패: $e");
     }
   }
 
