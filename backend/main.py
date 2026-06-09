@@ -338,12 +338,38 @@ def post_chat_message(request: ChatRequest):
                             f"방금 이 할 일과 예약 시간에 알람(알림)이 등록되었습니다. 사용자에게 다정하고 명확하게 알람 등록이 완료되었음을 알려주세요."
                         )
                     
+                    # 이전 대화 내역 조회 (가장 최근 10개)
+                    cursor.execute(
+                        "SELECT sender, message FROM ChatHistory WHERE id < ? AND msg_type = 'text' ORDER BY id DESC LIMIT 10",
+                        (user_msg_id,)
+                    )
+                    recent_history = cursor.fetchall()
+                    recent_history.reverse()
+                    
+                    contents = []
+                    for row in recent_history:
+                        role = "user" if row["sender"] == "user" else "model"
+                        contents.append(
+                            types.Content(
+                                role=role,
+                                parts=[types.Part.from_text(text=row["message"])]
+                            )
+                        )
+                    # 현재 사용자 메시지 추가
+                    contents.append(
+                        types.Content(
+                            role="user",
+                            parts=[types.Part.from_text(text=user_msg)]
+                        )
+                    )
+
                     config = types.GenerateContentConfig(
+                        system_instruction=system_instruction,
                         tools=[types.Tool(google_search=types.GoogleSearch())]
                     )
                     response = client.models.generate_content(
                         model="gemini-2.5-pro",
-                        contents=f"[역할 및 규칙]\n{system_instruction}\n\n[사용자 메시지]\n{user_msg}",
+                        contents=contents,
                         config=config
                     )
                     ai_reply = response.text.strip()
