@@ -1,4 +1,5 @@
 import os
+import sys
 import sqlite3
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -7,6 +8,13 @@ from pydantic import BaseModel
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+
+# stdout, stderr 인코딩 오류 방지 (Windows 콘솔 환경에서 이모지 출력 시 크래시 방지)
+try:
+    sys.stdout.reconfigure(errors='replace')
+    sys.stderr.reconfigure(errors='replace')
+except Exception:
+    pass
 
 # .env 파일에서 환경변수 로드 (기존 환경변수가 설정되어 있을 경우 덮어쓰도록 override=True 설정)
 env_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -67,6 +75,10 @@ class ChatRequest(BaseModel):
     message: str
     latitude: float = None
     longitude: float = None
+
+class SmsRequest(BaseModel):
+    receivers: list[str]
+    message: str
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -536,3 +548,28 @@ def clear_chat_history():
         return {"status": "success", "message": "모든 대화 내역이 성공적으로 초기화되었습니다."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"데이터 초기화 오류: {str(e)}")
+
+# 5. 가상 SMS 발송 API (실제 SMS API 연동을 위한 백본 마련)
+@app.post("/api/send-sms")
+def send_virtual_sms(request: SmsRequest):
+    receivers = request.receivers
+    message = request.message
+    
+    if not receivers:
+        raise HTTPException(status_code=400, detail="수신자 번호가 존재하지 않습니다.")
+    if not message:
+        raise HTTPException(status_code=400, detail="메시지 내용이 비어있습니다.")
+        
+    print("\n" + "=" * 50)
+    print("[SMS 발송 시뮬레이션]")
+    print(f"시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"수신처: {', '.join(receivers)}")
+    print(f"내용:\n{message}")
+    print("=" * 50 + "\n")
+    
+    return {
+        "status": "success",
+        "message": "안심 문자가 성공적으로 발송되었습니다. (가상 발송 완료)",
+        "receivers": receivers,
+        "content": message
+    }

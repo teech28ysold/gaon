@@ -288,8 +288,10 @@ class _ChatScreenState extends State<ChatScreen> {
       if (permission == LocationPermission.deniedForever) return null;
 
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 4),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 4),
+        ),
       );
     } catch (e) {
       debugPrint("위치 정보 획득 실패: $e");
@@ -611,17 +613,16 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 보호자 등록 상태 배너 (다중 보호자 지원)
   Widget _buildGuardianBanner() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: _guardianNumbers.isEmpty ? const Color(0xFFFEE2E2) : const Color(0xFFECFDF5),
+        color: _guardianNumbers.isEmpty ? const Color(0xFFFFE4E6) : const Color(0xFFD1FAE5),
         border: Border(
           bottom: BorderSide(
-            color: _guardianNumbers.isEmpty ? const Color(0xFFFCA5A5) : const Color(0xFFA7F3D0),
-            width: 1,
+            color: _guardianNumbers.isEmpty ? const Color(0xFFF43F5E) : const Color(0xFF10B981),
+            width: 2.5,
           ),
         ),
       ),
@@ -633,8 +634,8 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Icon(
                   _guardianNumbers.isEmpty ? Icons.warning_amber_rounded : Icons.verified_user_rounded,
-                  color: _guardianNumbers.isEmpty ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
-                  size: 24,
+                  color: _guardianNumbers.isEmpty ? const Color(0xFFE11D48) : const Color(0xFF047857),
+                  size: 26,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -645,9 +646,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? "보호자 연락처: ${_guardianNumbers.first} 🛡️"
                             : "보호자 연락처: ${_guardianNumbers.first} 외 ${_guardianNumbers.length - 1}명 🛡️",
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: 17.5,
                       fontWeight: FontWeight.bold,
-                      color: _guardianNumbers.isEmpty ? const Color(0xFF991B1B) : const Color(0xFF14532D),
+                      color: _guardianNumbers.isEmpty ? const Color(0xFF9F1239) : const Color(0xFF065F46),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -658,18 +659,18 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(width: 8),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _guardianNumbers.isEmpty ? const Color(0xFFEF4444) : const Color(0xFF28B59E),
+              backgroundColor: _guardianNumbers.isEmpty ? const Color(0xFFE11D48) : const Color(0xFF0F5A5C),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              elevation: 0,
+              elevation: 1.5,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => _showGuardianRegisterDialog(),
             child: Text(
               _guardianNumbers.isEmpty ? "등록" : "관리",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -1082,11 +1083,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final isWarning = status == 'warning';
 
     // 카드 테마 색상 설정
-    final cardBorderColor = isWarning ? const Color(0xFFFF6B6B) : const Color(0xFF28B59E);
-    final cardBgColor = isWarning ? const Color(0xFFFFF5F5) : const Color(0xFFF0FDF4);
-    final bannerBgColor = isWarning ? const Color(0xFFFFE3E3) : const Color(0xFFDCFCE7);
-    final bannerTextColor = isWarning ? const Color(0xFFC92A2A) : const Color(0xFF137333);
-    final iconColor = isWarning ? const Color(0xFFE03131) : const Color(0xFF0F5A5C);
+    final cardBorderColor = isWarning ? const Color(0xFFE11D48) : const Color(0xFF10B981);
+    final cardBgColor = isWarning ? const Color(0xFFFFF1F2) : const Color(0xFFECFDF5);
+    final bannerBgColor = isWarning ? const Color(0xFFFFE4E6) : const Color(0xFFD1FAE5);
+    final bannerTextColor = isWarning ? const Color(0xFF9F1239) : const Color(0xFF065F46);
+    final iconColor = isWarning ? const Color(0xFFE11D48) : const Color(0xFF047857);
     final iconData = isWarning ? Icons.warning_amber_rounded : Icons.verified_user_rounded;
 
     return Padding(
@@ -1117,7 +1118,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: cardBgColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cardBorderColor, width: 2),
+                          border: Border.all(color: cardBorderColor, width: isWarning ? 3.5 : 2.0),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withAlpha(20),
@@ -1146,8 +1147,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                   Expanded(
                                     child: Text(
                                       isWarning
-                                          ? "의심스러운 정보가 있습니다!"
-                                          : "검증된 유익한 영상입니다!",
+                                          ? "⚠️ 경고: 의심스러운 정보!"
+                                          : "✅ 검증 완료: 안전한 정보!",
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -1463,7 +1464,7 @@ class _ChatScreenState extends State<ChatScreen> {
           onTap: onPressed,
           customBorder: const CircleBorder(),
           child: Ink(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: color.withAlpha(31),
               shape: BoxShape.circle,
@@ -1632,6 +1633,24 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_guardianNumbers.isEmpty) return;
     
     final targetNames = _guardianNumbers.join(', ');
+    
+    // 백엔드로 가상 SMS 전송 요청 발송 (비동기 호출)
+    String smsContent = "[가온 안심알림] 부모님께서 가온 비서를 사용 중이십니다.";
+    if (alertType.contains("안심 안부 전송")) {
+      smsContent = "[가온 안심알림] 부모님께서 가온 비서를 사용 중이시며, 현재 건강하게 잘 계신다고 안부를 전하셨습니다. 😊";
+    } else if (alertType.contains("사진 분석")) {
+      smsContent = "[가온 안심알림] 부모님께서 약봉투/처방전 사진 분석을 완료하셨습니다. 건강을 잘 챙기고 계십니다. 🛡️";
+    } else if (alertType.contains("등록:")) {
+      smsContent = "[가온 안심알림] 부모님께서 새로운 일정을 등록하셨습니다: ${alertType.split(':').last.trim()} 🔔";
+    } else {
+      smsContent = "[가온 안심알림] 알림: $alertType";
+    }
+
+    ApiService.sendSms(_guardianNumbers, smsContent).then((value) {
+      debugPrint("가상 SMS 백엔드 전송 성공: $value");
+    }).catchError((err) {
+      debugPrint("가상 SMS 백엔드 전송 에러: $err");
+    });
     
     showDialog(
       context: context,

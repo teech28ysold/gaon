@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' show Platform;
 import 'package:http_parser/http_parser.dart';
 
 class ApiService {
@@ -34,8 +32,8 @@ class ApiService {
     try {
       final bodyMap = {
         'message': message,
-        if (latitude != null) 'latitude': latitude,
-        if (longitude != null) 'longitude': longitude,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
       };
       
       final response = await http.post(
@@ -102,6 +100,27 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('이미지 업로드 및 분석 실패 (주소: $baseUrl). 상세: $e');
+    }
+  }
+
+  // 5. 가상 안심 문자 발송 요청
+  static Future<Map<String, dynamic>> sendSms(List<String> receivers, String message) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/send-sms'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'receivers': receivers,
+          'message': message,
+        }),
+      );
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(json.decode(utf8.decode(response.bodyBytes)));
+      } else {
+        throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('SMS 발송 요청 실패 (주소: $baseUrl). 상세: $e');
     }
   }
 }
