@@ -7,8 +7,6 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <!-- 인터넷 권한 -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- 알림 권한 (Android 13 이상 대응) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- 마이크 음성 인식을 위한 녹음 권한 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     

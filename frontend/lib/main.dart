@@ -52,13 +52,14 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   bool _isSending = false;
   bool _isAnalyzingYoutube = false;
+  bool _isHomeMode = true;
   List<String> _guardianNumbers = [];
   String? _currentlySpeakingText;
   final FlutterTts _flutterTts = FlutterTts();
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   String _speechText = '';
-  
+
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _picker = ImagePicker();
@@ -75,7 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
         '무릎 관절통을 줄여주는 무리 없는 스트레칭 알려줘 🩺',
         '치매 예방을 위해 매일 쉽게 할 수 있는 뇌 운동 알려줘 🧠',
         '나이가 들면서 생기는 불면증 극복 방법 알려줘 💤',
-      ]
+      ],
     },
     {
       'title': '🍳 소화 잘되는 요리',
@@ -87,7 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
         '단백질이 가득해 뼈에 좋은 맛있는 두부 반찬 요리법 알려줘 🥘',
         '당뇨 환자도 맛있게 먹을 수 있는 저염식 나물 무침 알려줘 🥗',
         '기력 회복에 도움되는 초간단 삼계탕 끓이는 법 알려줘 🍲',
-      ]
+      ],
     },
     {
       'title': '⛰️ 추천 등산 코스',
@@ -99,7 +100,7 @@ class _ChatScreenState extends State<ChatScreen> {
         '관절 무리 없이 상쾌하게 다녀올 수 있는 완만한 등산로 추천해줘 ⛰',
         '어르신들이 주말에 바람 쐬기 좋은 예쁜 생태 공원 알려줘 🌸',
         '피톤치드 마시며 힐링할 수 있는 전국 유명 숲길 알려줘 🌲',
-      ]
+      ],
     },
     {
       'title': '🌸 재미와 소식',
@@ -111,7 +112,7 @@ class _ChatScreenState extends State<ChatScreen> {
         '마음이 차분해지는 따뜻한 시 한 편 다정하게 읽어줘 📝',
         '요즘 60~70대 친구들이 가장 선호하는 유익한 취미 생활 추천해줘 🎨',
         '은퇴 후에 나라에서 받을 수 있는 소소한 혜택이나 복지 정보 알려줘 🎁',
-      ]
+      ],
     },
   ];
 
@@ -124,25 +125,26 @@ class _ChatScreenState extends State<ChatScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image == null) return;
-      
+
       final tempUserMessage = {
         'id': -1,
         'sender': 'user',
         'message': '📷 [사진] 문서 해독을 요청하셨습니다.',
         'timestamp': DateTime.now().toString(),
       };
-      
+
       setState(() {
         _messages.add(tempUserMessage);
         _isSending = true;
+        _isHomeMode = false;
       });
       _scrollToBottom();
-      
+
       final bytes = await image.readAsBytes();
       final response = await ApiService.sendChatImage(bytes, image.name);
-      
+
       if (response['status'] == 'success') {
         setState(() {
           final int tempIdx = _messages.indexOf(tempUserMessage);
@@ -153,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _isSending = false;
         });
         _scrollToBottom();
-        
+
         if (_guardianNumbers.isNotEmpty) {
           Future.delayed(const Duration(milliseconds: 500), () {
             _showGuardianSmsAlert("부모님 문서/처방전 사진 분석 완료");
@@ -175,7 +177,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadGuardianNumbers();
     _loadHistory();
     _scheduleDailyReminders();
-    
+
     // TTS 재생 완료/취소/에러 핸들러 설정
     _flutterTts.setCompletionHandler(() {
       if (mounted) {
@@ -215,7 +217,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // 하위 호환성: 기존 단일 등록 번호 가져와 마이그레이션
       final legacyNumber = prefs.getString('guardian_number') ?? '';
       List<String> loaded = prefs.getStringList('guardian_numbers') ?? [];
-      
+
       if (legacyNumber.isNotEmpty) {
         if (!loaded.contains(legacyNumber)) {
           loaded.add(legacyNumber);
@@ -223,7 +225,7 @@ class _ChatScreenState extends State<ChatScreen> {
         await prefs.setStringList('guardian_numbers', loaded);
         await prefs.remove('guardian_number'); // 마이그레이션 완료 후 이전 단일 키 제거
       }
-      
+
       setState(() {
         _guardianNumbers = loaded;
       });
@@ -284,7 +286,7 @@ class _ChatScreenState extends State<ChatScreen> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) return null;
       }
-      
+
       if (permission == LocationPermission.deniedForever) return null;
 
       return await Geolocator.getCurrentPosition(
@@ -307,7 +309,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (customText == null) {
       _textController.clear();
     }
-    
+
     // UI에 사용자 메시지 선배치 (빠른 반응성 제공)
     final tempUserMessage = {
       'id': -1, // 임시 ID
@@ -322,6 +324,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages.add(tempUserMessage);
       _isSending = true;
+      _isHomeMode = false;
       if (isYoutube) {
         _isAnalyzingYoutube = true;
       }
@@ -330,14 +333,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // 위치 관련 단어가 들어가거나 주변 시설 조회를 원할 때만 GPS 정보 로드
     Position? pos;
-    final bool isLocationQuery = text.contains("주변") || 
-                                 text.contains("근처") || 
-                                 text.contains("병원") || 
-                                 text.contains("약국") || 
-                                 text.contains("날씨") || 
-                                 text.contains("등산") || 
-                                 text.contains("맛집") || 
-                                 text.contains("위치");
+    final bool isLocationQuery =
+        text.contains("주변") ||
+        text.contains("근처") ||
+        text.contains("병원") ||
+        text.contains("약국") ||
+        text.contains("날씨") ||
+        text.contains("등산") ||
+        text.contains("맛집") ||
+        text.contains("위치");
     if (isLocationQuery) {
       pos = await _getCurrentLocation();
     }
@@ -384,29 +388,33 @@ class _ChatScreenState extends State<ChatScreen> {
       final id = schedule['id'] as int;
       final taskContent = schedule['task_content'] as String;
       final taskTimeStr = schedule['task_time'] as String;
-      
+
       // taskTimeStr 형식: "YYYY-MM-DD HH:MM:SS" -> DateTime 파싱
       final DateTime scheduledTime = DateTime.parse(taskTimeStr);
-      
+
       NotificationService.scheduleNotification(
         id: id,
         title: "⏰ 가온 비서 일정 알림",
         body: taskContent,
         scheduledDate: scheduledTime,
       );
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               "🔔 알람 예약 완료: '$taskContent' (${taskTimeStr.substring(11, 16)})",
-              style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 18,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             backgroundColor: const Color(0xFF0F5A5C),
             duration: const Duration(seconds: 4),
           ),
         );
-        
+
         if (_guardianNumbers.isNotEmpty) {
           Future.delayed(const Duration(milliseconds: 500), () {
             _showGuardianSmsAlert("일정 및 알람 등록: $taskContent");
@@ -428,7 +436,10 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("대화 내역이 모두 초기화되었습니다.", style: TextStyle(fontSize: 16)),
+            content: Text(
+              "대화 내역이 모두 초기화되었습니다.",
+              style: TextStyle(fontSize: 16),
+            ),
             backgroundColor: Colors.blueGrey,
           ),
         );
@@ -456,7 +467,10 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(fontSize: 16, color: Colors.white)),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 16, color: Colors.white),
+        ),
         backgroundColor: Colors.redAccent,
         duration: const Duration(seconds: 4),
         action: SnackBarAction(
@@ -474,8 +488,13 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text("⚠️ 대화 비우기", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            "⚠️ 대화 비우기",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
           content: const Text(
             "이전 대화 내용이 모두 사라집니다.\n정말로 모든 대화를 지우시겠습니까?",
             style: TextStyle(fontSize: 18, height: 1.4),
@@ -484,13 +503,18 @@ class _ChatScreenState extends State<ChatScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("취소", style: TextStyle(fontSize: 18, color: Colors.grey)),
+              child: const Text(
+                "취소",
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: () {
                 Navigator.pop(context);
@@ -539,7 +563,11 @@ class _ChatScreenState extends State<ChatScreen> {
           children: const [
             Text(
               "가온 (Gaon)",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             Text(
               "나만의 다정한 AI 비서",
@@ -548,13 +576,35 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          if (!_isHomeMode)
+            IconButton(
+              icon: const Icon(
+                Icons.home_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+              tooltip: "처음 화면",
+              onPressed: () {
+                setState(() {
+                  _isHomeMode = true;
+                });
+              },
+            ),
           IconButton(
-            icon: const Icon(Icons.shield_outlined, color: Colors.white, size: 28),
+            icon: const Icon(
+              Icons.shield_outlined,
+              color: Colors.white,
+              size: 28,
+            ),
             tooltip: "보호자 등록",
             onPressed: _showGuardianRegisterDialog,
           ),
           IconButton(
-            icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 28),
+            icon: const Icon(
+              Icons.delete_sweep_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
             tooltip: "대화 비우기",
             onPressed: _showClearConfirmDialog,
           ),
@@ -566,50 +616,56 @@ class _ChatScreenState extends State<ChatScreen> {
           // 보호자 연락처 항시 표시 바
           _buildGuardianBanner(),
           // 채팅 메시지 영역
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF0F5A5C)),
-                  )
-                : _messages.isEmpty
-                    ? _buildWelcomeWidget()
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _messages.length + (_isSending ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          // 대기 애니메이션 표시
-                          if (index == _messages.length) {
-                            return _buildTypingIndicator();
-                          }
-                          
-                          final msg = _messages[index];
-                          final isUser = msg['sender'] == 'user';
-                          final msgType = msg['msg_type'] ?? 'text';
+          Expanded(child: _isHomeMode ? _buildPurposeHome() : _buildChatArea()),
 
-                          if (!isUser && msgType == 'fact_check') {
-                            return _buildFactCheckCard(
-                              messageJson: msg['message'] ?? '',
-                              timestamp: msg['timestamp'] ?? '',
-                            );
-                          }
-                          
-                          return _buildChatBubble(
-                            message: msg['message'] ?? '',
-                            isUser: isUser,
-                            timestamp: msg['timestamp'] ?? '',
-                          );
-                        },
-                      ),
-          ),
-          
           // 단축 질문 칩 영역
-          _buildQuickActionsRow(),
-          
+          if (!_isHomeMode) _buildQuickActionsRow(),
+
           // 하단 입력 & 마이크 & 카메라 영역 (단일 채팅 UI)
-          _buildBottomInputBar(),
+          if (!_isHomeMode) _buildBottomInputBar(),
         ],
       ),
+    );
+  }
+
+  Widget _buildChatArea() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF0F5A5C)),
+      );
+    }
+
+    if (_messages.isEmpty) {
+      return _buildEmptyChatHint();
+    }
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      itemCount: _messages.length + (_isSending ? 1 : 0),
+      itemBuilder: (context, index) {
+        // 대기 애니메이션 표시
+        if (index == _messages.length) {
+          return _buildTypingIndicator();
+        }
+
+        final msg = _messages[index];
+        final isUser = msg['sender'] == 'user';
+        final msgType = msg['msg_type'] ?? 'text';
+
+        if (!isUser && msgType == 'fact_check') {
+          return _buildFactCheckCard(
+            messageJson: msg['message'] ?? '',
+            timestamp: msg['timestamp'] ?? '',
+          );
+        }
+
+        return _buildChatBubble(
+          message: msg['message'] ?? '',
+          isUser: isUser,
+          timestamp: msg['timestamp'] ?? '',
+        );
+      },
     );
   }
 
@@ -618,10 +674,14 @@ class _ChatScreenState extends State<ChatScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: _guardianNumbers.isEmpty ? const Color(0xFFFFE4E6) : const Color(0xFFD1FAE5),
+        color: _guardianNumbers.isEmpty
+            ? const Color(0xFFFFE4E6)
+            : const Color(0xFFD1FAE5),
         border: Border(
           bottom: BorderSide(
-            color: _guardianNumbers.isEmpty ? const Color(0xFFF43F5E) : const Color(0xFF10B981),
+            color: _guardianNumbers.isEmpty
+                ? const Color(0xFFF43F5E)
+                : const Color(0xFF10B981),
             width: 2.5,
           ),
         ),
@@ -633,8 +693,12 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               children: [
                 Icon(
-                  _guardianNumbers.isEmpty ? Icons.warning_amber_rounded : Icons.verified_user_rounded,
-                  color: _guardianNumbers.isEmpty ? const Color(0xFFE11D48) : const Color(0xFF047857),
+                  _guardianNumbers.isEmpty
+                      ? Icons.warning_amber_rounded
+                      : Icons.verified_user_rounded,
+                  color: _guardianNumbers.isEmpty
+                      ? const Color(0xFFE11D48)
+                      : const Color(0xFF047857),
                   size: 26,
                 ),
                 const SizedBox(width: 10),
@@ -643,12 +707,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     _guardianNumbers.isEmpty
                         ? "안심 문자를 받을 보호자 번호가 등록되지 않았습니다."
                         : _guardianNumbers.length == 1
-                            ? "보호자 연락처: ${_guardianNumbers.first} 🛡️"
-                            : "보호자 연락처: ${_guardianNumbers.first} 외 ${_guardianNumbers.length - 1}명 🛡️",
+                        ? "보호자 연락처: ${_guardianNumbers.first} 🛡️"
+                        : "보호자 연락처: ${_guardianNumbers.first} 외 ${_guardianNumbers.length - 1}명 🛡️",
                     style: TextStyle(
                       fontSize: 17.5,
                       fontWeight: FontWeight.bold,
-                      color: _guardianNumbers.isEmpty ? const Color(0xFF9F1239) : const Color(0xFF065F46),
+                      color: _guardianNumbers.isEmpty
+                          ? const Color(0xFF9F1239)
+                          : const Color(0xFF065F46),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -659,13 +725,17 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(width: 8),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _guardianNumbers.isEmpty ? const Color(0xFFE11D48) : const Color(0xFF0F5A5C),
+              backgroundColor: _guardianNumbers.isEmpty
+                  ? const Color(0xFFE11D48)
+                  : const Color(0xFF0F5A5C),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               elevation: 1.5,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () => _showGuardianRegisterDialog(),
             child: Text(
@@ -678,7 +748,351 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildPurposeHome() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(10),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: const [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Color(0xFFE0F2F1),
+                  child: Icon(
+                    Icons.health_and_safety_rounded,
+                    color: Color(0xFF0F5A5C),
+                    size: 34,
+                  ),
+                ),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    "필요한 일을 바로 눌러주세요",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E272E),
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildPurposeButton(
+            icon: Icons.ondemand_video_rounded,
+            title: "영상 확인",
+            subtitle: "유튜브 링크가 믿을 만한지 확인합니다.",
+            color: const Color(0xFFE11D48),
+            bgColor: const Color(0xFFFFF1F2),
+            onTap: _showYoutubeCheckDialog,
+          ),
+          _buildPurposeButton(
+            icon: Icons.document_scanner_rounded,
+            title: "문서 읽기",
+            subtitle: "안내문, 처방전, 약봉투를 사진으로 읽습니다.",
+            color: const Color(0xFFD97706),
+            bgColor: const Color(0xFFFEF3C7),
+            onTap: _pickAndSendImage,
+          ),
+          _buildPurposeButton(
+            icon: Icons.alarm_rounded,
+            title: "약과 일정 알림",
+            subtitle: "복용 시간이나 병원 일정을 알림으로 등록합니다.",
+            color: const Color(0xFF2563EB),
+            bgColor: const Color(0xFFEFF6FF),
+            onTap: _showScheduleHelpDialog,
+          ),
+          _buildPurposeButton(
+            icon: Icons.family_restroom_rounded,
+            title: "자녀 안심 알림",
+            subtitle: "보호자에게 안부 문자를 보냅니다.",
+            color: const Color(0xFF16A34A),
+            bgColor: const Color(0xFFF0FDF4),
+            onTap: _sendGuardianSafetyAlert,
+          ),
+          _buildPurposeButton(
+            icon: Icons.mic_rounded,
+            title: "말로 물어보기",
+            subtitle: "궁금한 것을 말하면 가온이 답해드립니다.",
+            color: const Color(0xFF0F5A5C),
+            bgColor: const Color(0xFFE0F2F1),
+            onTap: _showVoiceDialog,
+          ),
+          _buildPurposeButton(
+            icon: Icons.chat_bubble_rounded,
+            title: "직접 질문하기",
+            subtitle: "채팅 화면에서 자유롭게 질문합니다.",
+            color: const Color(0xFF6D28D9),
+            bgColor: const Color(0xFFF3E8FF),
+            onTap: () {
+              setState(() {
+                _isHomeMode = false;
+              });
+              _scrollToBottom();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPurposeButton({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withAlpha(60), width: 1.5),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 40),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E272E),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          color: Colors.black54,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: color.withAlpha(170),
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyChatHint() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 56,
+              color: Color(0xFF0F5A5C),
+            ),
+            SizedBox(height: 14),
+            Text(
+              "아래 입력창이나 마이크로\n편하게 물어보세요.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E272E),
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showYoutubeCheckDialog() {
+    final urlController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            "영상 확인",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          content: TextField(
+            controller: urlController,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            decoration: const InputDecoration(
+              labelText: "유튜브 링크",
+              hintText: "https://youtu.be/...",
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("취소", style: TextStyle(fontSize: 18)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE11D48),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                final url = urlController.text.trim();
+                if (url.isEmpty) return;
+                Navigator.pop(context);
+                _sendMessage(
+                  customText: "이 유튜브 영상이 어르신이 믿고 봐도 되는 영상인지 확인해줘: $url",
+                );
+              },
+              child: const Text("확인하기", style: TextStyle(fontSize: 18)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showScheduleHelpDialog() {
+    final scheduleController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                "약과 일정 알림",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: scheduleController,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: const InputDecoration(
+                  hintText: "예: 오늘 저녁 8시에 혈압약 알림",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text(
+                      "1분 뒤 약 알림",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _sendMessage(customText: "1분 뒤에 약 먹기 알림 등록해줘");
+                    },
+                  ),
+                  ActionChip(
+                    label: const Text(
+                      "오늘 저녁 8시",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _sendMessage(customText: "오늘 저녁 8시에 약 먹기 알림 등록해줘");
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () {
+                  final text = scheduleController.text.trim();
+                  if (text.isEmpty) return;
+                  Navigator.pop(context);
+                  _sendMessage(customText: text);
+                },
+                child: const Text(
+                  "알림 등록하기",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // 환영 웰컴 스크린 (시니어 대시보드 구조 - 줄바꿈 방지를 위해 1열 목록으로 개선)
+  // ignore: unused_element
   Widget _buildWelcomeWidget() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -696,8 +1110,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: const Color(0xFF0F5A5C).withAlpha(12),
                   blurRadius: 15,
                   spreadRadius: 2,
-                )
-              ]
+                ),
+              ],
             ),
             child: const Icon(
               Icons.support_agent_rounded,
@@ -739,17 +1153,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   onTap: () => _showShortcutQuestions(cat),
                   borderRadius: BorderRadius.circular(18),
                   child: Ink(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 18,
+                    ),
                     decoration: BoxDecoration(
                       color: cat['bgColor'],
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: cat['color'].withAlpha(40), width: 1.5),
+                      border: Border.all(
+                        color: cat['color'].withAlpha(40),
+                        width: 1.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: cat['color'].withAlpha(10),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
-                        )
+                        ),
                       ],
                     ),
                     child: Row(
@@ -767,8 +1187,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         Icon(
-                          Icons.arrow_forward_ios_rounded, 
-                          size: 18, 
+                          Icons.arrow_forward_ios_rounded,
+                          size: 18,
                           color: cat['color'].withAlpha(150),
                         ),
                       ],
@@ -779,7 +1199,7 @@ class _ChatScreenState extends State<ChatScreen> {
             },
           ),
           const SizedBox(height: 12),
-          
+
           // 자녀 안심 알림 퀵 카드
           InkWell(
             onTap: () => _sendGuardianSafetyAlert(),
@@ -796,12 +1216,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: Colors.green.withAlpha(10),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
-                  )
+                  ),
                 ],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.mail_outline_rounded, size: 36, color: Color(0xFF16A34A)),
+                  const Icon(
+                    Icons.mail_outline_rounded,
+                    size: 36,
+                    color: Color(0xFF16A34A),
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -809,17 +1233,28 @@ class _ChatScreenState extends State<ChatScreen> {
                       children: const [
                         Text(
                           "✉️ 자녀에게 안심 안부 보내기",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF16A34A),
+                          ),
                         ),
                         SizedBox(height: 4),
                         Text(
                           "부모님이 잘 계신다는 문자를 자녀분께 보내드립니다.",
-                          style: TextStyle(fontSize: 14.5, color: Colors.blueGrey),
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            color: Colors.blueGrey,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF16A34A)),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Color(0xFF16A34A),
+                  ),
                 ],
               ),
             ),
@@ -854,7 +1289,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     const SizedBox(width: 8),
                     Text(
                       "${category['title']} 추천 질문",
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E272E)),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E272E),
+                      ),
                     ),
                   ],
                 ),
@@ -877,9 +1316,17 @@ class _ChatScreenState extends State<ChatScreen> {
                             backgroundColor: Colors.white,
                             foregroundColor: const Color(0xFF1E272E),
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            side: BorderSide(color: category['color'].withAlpha(60), width: 1.5),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            side: BorderSide(
+                              color: category['color'].withAlpha(60),
+                              width: 1.5,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                             alignment: Alignment.centerLeft,
                           ),
                           onPressed: () {
@@ -915,13 +1362,22 @@ class _ChatScreenState extends State<ChatScreen> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Row(
               children: const [
-                Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.redAccent,
+                  size: 28,
+                ),
                 SizedBox(width: 8),
                 Expanded(
-                  child: Text("보호자 등록 필요", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    "보호자 등록 필요",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -932,7 +1388,10 @@ class _ChatScreenState extends State<ChatScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("닫기", style: TextStyle(fontSize: 18, color: Colors.grey)),
+                child: const Text(
+                  "닫기",
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -958,25 +1417,41 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: const [
-              Icon(Icons.mark_email_read_rounded, color: Color(0xFF16A34A), size: 28),
+              Icon(
+                Icons.mark_email_read_rounded,
+                color: Color(0xFF16A34A),
+                size: 28,
+              ),
               SizedBox(width: 8),
               Expanded(
-                child: Text("안심 안부 문자 전송", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                child: Text(
+                  "안심 안부 문자 전송",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
           content: Text(
             "보호자 연락처 ($targetNames) 로 아래 안심 문자를 전송하시겠습니까?\n\n\"[가온 안심알림] 부모님께서 가온 비서를 사용 중이시며, 현재 건강하게 잘 계신다고 안부를 전하셨습니다. 😊\"",
-            style: const TextStyle(fontSize: 17, height: 1.5, color: Colors.black87),
+            style: const TextStyle(
+              fontSize: 17,
+              height: 1.5,
+              color: Colors.black87,
+            ),
           ),
           actionsOverflowDirection: VerticalDirection.down,
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("취소", style: TextStyle(fontSize: 18, color: Colors.grey)),
+              child: const Text(
+                "취소",
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -1005,17 +1480,31 @@ class _ChatScreenState extends State<ChatScreen> {
           CircleAvatar(
             backgroundColor: const Color(0xFF0F5A5C),
             radius: 20,
-            child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 20),
+            child: const Icon(
+              Icons.support_agent_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 8),
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("가온 AI", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black54)),
+                const Text(
+                  "가온 AI",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black54,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: const BorderRadius.only(
@@ -1024,8 +1513,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       bottomRight: Radius.circular(16),
                     ),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 4, offset: const Offset(0, 2))
-                    ]
+                      BoxShadow(
+                        color: Colors.black.withAlpha(8),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1033,17 +1526,27 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F5A5C)),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF0F5A5C),
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Flexible(
                         child: Text(
                           _isAnalyzingYoutube
                               ? "가온이가 유튜브 영상을 꼼꼼하게 팩트 체크하는 중입니다..."
-                              : (_messages.isNotEmpty && _messages.last['message'].toString().contains("📷")
-                                  ? "가온이가 사진을 읽고 분석하는 중입니다..."
-                                  : "가온이가 생각하고 있습니다..."),
-                          style: const TextStyle(fontSize: 17, color: Colors.black54, fontWeight: FontWeight.w500),
+                              : (_messages.isNotEmpty &&
+                                        _messages.last['message']
+                                            .toString()
+                                            .contains("📷")
+                                    ? "가온이가 사진을 읽고 분석하는 중입니다..."
+                                    : "가온이가 생각하고 있습니다..."),
+                          style: const TextStyle(
+                            fontSize: 17,
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
@@ -1083,12 +1586,24 @@ class _ChatScreenState extends State<ChatScreen> {
     final isWarning = status == 'warning';
 
     // 카드 테마 색상 설정
-    final cardBorderColor = isWarning ? const Color(0xFFE11D48) : const Color(0xFF10B981);
-    final cardBgColor = isWarning ? const Color(0xFFFFF1F2) : const Color(0xFFECFDF5);
-    final bannerBgColor = isWarning ? const Color(0xFFFFE4E6) : const Color(0xFFD1FAE5);
-    final bannerTextColor = isWarning ? const Color(0xFF9F1239) : const Color(0xFF065F46);
-    final iconColor = isWarning ? const Color(0xFFE11D48) : const Color(0xFF047857);
-    final iconData = isWarning ? Icons.warning_amber_rounded : Icons.verified_user_rounded;
+    final cardBorderColor = isWarning
+        ? const Color(0xFFE11D48)
+        : const Color(0xFF10B981);
+    final cardBgColor = isWarning
+        ? const Color(0xFFFFF1F2)
+        : const Color(0xFFECFDF5);
+    final bannerBgColor = isWarning
+        ? const Color(0xFFFFE4E6)
+        : const Color(0xFFD1FAE5);
+    final bannerTextColor = isWarning
+        ? const Color(0xFF9F1239)
+        : const Color(0xFF065F46);
+    final iconColor = isWarning
+        ? const Color(0xFFE11D48)
+        : const Color(0xFF047857);
+    final iconData = isWarning
+        ? Icons.warning_amber_rounded
+        : Icons.verified_user_rounded;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1098,7 +1613,11 @@ class _ChatScreenState extends State<ChatScreen> {
           CircleAvatar(
             backgroundColor: const Color(0xFF0F5A5C),
             radius: 22,
-            child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.support_agent_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 8),
           Flexible(
@@ -1107,7 +1626,11 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 const Text(
                   "가온 비서 (정보 방패 🛡️)",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -1118,7 +1641,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: cardBgColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cardBorderColor, width: isWarning ? 3.5 : 2.0),
+                          border: Border.all(
+                            color: cardBorderColor,
+                            width: isWarning ? 3.5 : 2.0,
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withAlpha(20),
@@ -1132,7 +1658,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           children: [
                             // 1. 상태 배너 및 카테고리 뱃지
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: bannerBgColor,
                                 borderRadius: const BorderRadius.only(
@@ -1158,9 +1687,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ),
                                   // 카테고리 표시
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: isWarning ? const Color(0xFFFFC9C9) : const Color(0xFFBBF7D0),
+                                      color: isWarning
+                                          ? const Color(0xFFFFC9C9)
+                                          : const Color(0xFFBBF7D0),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
@@ -1202,7 +1736,11 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                             ),
                             // 구분선
-                            Divider(color: cardBorderColor.withAlpha(100), height: 1, thickness: 1),
+                            Divider(
+                              color: cardBorderColor.withAlpha(100),
+                              height: 1,
+                              thickness: 1,
+                            ),
                             // 3. 상세내용 펼치기 영역
                             FactCheckDetailsExpander(
                               details: details,
@@ -1216,7 +1754,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     const SizedBox(width: 6),
                     Text(
                       formattedTime,
-                      style: const TextStyle(fontSize: 13, color: Colors.black38),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black38,
+                      ),
                     ),
                   ],
                 ),
@@ -1250,7 +1791,10 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 8),
             Flexible(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
                 decoration: const BoxDecoration(
                   color: Color(0xFFFEF3C7), // 아늑하고 높은 대비의 소프트 옐로우
                   borderRadius: BorderRadius.only(
@@ -1264,8 +1808,8 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: Colors.black12,
                       blurRadius: 4,
                       offset: Offset(1, 2),
-                    )
-                  ]
+                    ),
+                  ],
                 ),
                 child: SelectableText(
                   message,
@@ -1291,7 +1835,11 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               backgroundColor: const Color(0xFF0F5A5C),
               radius: 24,
-              child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 28),
+              child: const Icon(
+                Icons.support_agent_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
             const SizedBox(width: 10),
             Flexible(
@@ -1300,7 +1848,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   const Text(
                     "가온 비서",
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Column(
@@ -1308,7 +1860,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: const BorderRadius.only(
@@ -1322,8 +1877,8 @@ class _ChatScreenState extends State<ChatScreen> {
                               color: Colors.black.withAlpha(15),
                               blurRadius: 5,
                               offset: const Offset(0, 2),
-                            )
-                          ]
+                            ),
+                          ],
                         ),
                         child: SelectableText(
                           message,
@@ -1341,14 +1896,22 @@ class _ChatScreenState extends State<ChatScreen> {
                           // TTS 재생/중지 아이콘 버튼
                           _currentlySpeakingText == message
                               ? IconButton(
-                                  icon: const Icon(Icons.stop_circle_rounded, color: Colors.redAccent, size: 28),
+                                  icon: const Icon(
+                                    Icons.stop_circle_rounded,
+                                    color: Colors.redAccent,
+                                    size: 28,
+                                  ),
                                   padding: const EdgeInsets.all(4),
                                   constraints: const BoxConstraints(),
                                   onPressed: _stopTts,
                                   tooltip: "읽기 중지",
                                 )
                               : IconButton(
-                                  icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF28B59E), size: 26),
+                                  icon: const Icon(
+                                    Icons.volume_up_rounded,
+                                    color: Color(0xFF28B59E),
+                                    size: 26,
+                                  ),
                                   padding: const EdgeInsets.all(4),
                                   constraints: const BoxConstraints(),
                                   onPressed: () => _playSimulatedTts(message),
@@ -1357,7 +1920,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           const SizedBox(width: 10),
                           Text(
                             formattedTime,
-                            style: const TextStyle(fontSize: 14, color: Colors.black45),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black45,
+                            ),
                           ),
                         ],
                       ),
@@ -1387,7 +1953,7 @@ class _ChatScreenState extends State<ChatScreen> {
             color: Colors.black.withAlpha(20),
             blurRadius: 10,
             offset: const Offset(0, -3),
-          )
+          ),
         ],
       ),
       child: SafeArea(
@@ -1401,7 +1967,7 @@ class _ChatScreenState extends State<ChatScreen> {
               onPressed: _pickAndSendImage,
             ),
             const SizedBox(width: 10),
-            
+
             // 2. 마이크 버튼
             _buildCircularIconButton(
               icon: Icons.mic_rounded,
@@ -1410,22 +1976,31 @@ class _ChatScreenState extends State<ChatScreen> {
               onPressed: _showVoiceDialog,
             ),
             const SizedBox(width: 10),
-            
+
             // 3. 텍스트 입력창
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: const Color(0xFFD1D5DB), width: 1.5),
+                  border: Border.all(
+                    color: const Color(0xFFD1D5DB),
+                    width: 1.5,
+                  ),
                 ),
                 child: TextField(
                   controller: _textController,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                   decoration: const InputDecoration(
                     hintText: "가온에게 물어보세요...",
                     hintStyle: TextStyle(fontSize: 20, color: Colors.black45),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
                     border: InputBorder.none,
                     isDense: true,
                   ),
@@ -1434,7 +2009,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            
+
             // 4. 전송 버튼
             _buildCircularIconButton(
               icon: Icons.send_rounded,
@@ -1469,11 +2044,7 @@ class _ChatScreenState extends State<ChatScreen> {
               color: color.withAlpha(31),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
-            ),
+            child: Icon(icon, color: color, size: 28),
           ),
         ),
       ),
@@ -1489,13 +2060,25 @@ class _ChatScreenState extends State<ChatScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: Row(
                 children: const [
-                  Icon(Icons.family_restroom_rounded, color: Color(0xFF0F5A5C), size: 28),
+                  Icon(
+                    Icons.family_restroom_rounded,
+                    color: Color(0xFF0F5A5C),
+                    size: 28,
+                  ),
                   SizedBox(width: 8),
                   Expanded(
-                    child: Text("보호자 연락처 관리", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      "보호자 연락처 관리",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -1507,10 +2090,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: [
                     const Text(
                       "자녀분들의 연락처를 등록해 주세요. 일정이 예약되거나 안심 알림 시 등록된 모든 연락처로 문자가 발송됩니다.",
-                      style: TextStyle(fontSize: 15.5, height: 1.4, color: Colors.black87),
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        height: 1.4,
+                        color: Colors.black87,
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // 등록된 연락처 리스트
                     if (_guardianNumbers.isEmpty)
                       const Padding(
@@ -1518,7 +2105,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Center(
                           child: Text(
                             "등록된 보호자 연락처가 없습니다.",
-                            style: TextStyle(fontSize: 16, color: Colors.black38, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.black38,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       )
@@ -1532,20 +2123,32 @@ class _ChatScreenState extends State<ChatScreen> {
                             final number = _guardianNumbers[index];
                             return Container(
                               margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF3F4F6),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     number,
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1F2937),
+                                    ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                      color: Colors.redAccent,
+                                      size: 22,
+                                    ),
                                     onPressed: () {
                                       setState(() {
                                         _guardianNumbers.removeAt(index);
@@ -1569,13 +2172,19 @@ class _ChatScreenState extends State<ChatScreen> {
                           child: TextField(
                             controller: newNumberController,
                             keyboardType: TextInputType.phone,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                             decoration: const InputDecoration(
                               labelText: "새 보호자 번호",
                               labelStyle: TextStyle(fontSize: 14),
                               hintText: "예: 010-1234-5678",
                               border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                             ),
                           ),
                         ),
@@ -1584,8 +2193,13 @@ class _ChatScreenState extends State<ChatScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0F5A5C),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                           onPressed: () {
                             final newNum = newNumberController.text.trim();
@@ -1600,7 +2214,13 @@ class _ChatScreenState extends State<ChatScreen> {
                               _saveGuardianNumbers();
                             }
                           },
-                          child: const Text("추가", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            "추가",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1612,8 +2232,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0F5A5C),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
                   onPressed: () {
                     Navigator.pop(context);
@@ -1629,53 +2254,89 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   // 5단계: 보호자 안심문자 시각화 모달
-  void _showGuardianSmsAlert(String alertType) {
+  void _showGuardianSmsAlert(String alertType) async {
     if (_guardianNumbers.isEmpty) return;
-    
+
     final targetNames = _guardianNumbers.join(', ');
-    
+
     // 백엔드로 가상 SMS 전송 요청 발송 (비동기 호출)
     String smsContent = "[가온 안심알림] 부모님께서 가온 비서를 사용 중이십니다.";
     if (alertType.contains("안심 안부 전송")) {
-      smsContent = "[가온 안심알림] 부모님께서 가온 비서를 사용 중이시며, 현재 건강하게 잘 계신다고 안부를 전하셨습니다. 😊";
+      smsContent =
+          "[가온 안심알림] 부모님께서 가온 비서를 사용 중이시며, 현재 건강하게 잘 계신다고 안부를 전하셨습니다. 😊";
     } else if (alertType.contains("사진 분석")) {
-      smsContent = "[가온 안심알림] 부모님께서 약봉투/처방전 사진 분석을 완료하셨습니다. 건강을 잘 챙기고 계십니다. 🛡️";
+      smsContent =
+          "[가온 안심알림] 부모님께서 약봉투/처방전 사진 분석을 완료하셨습니다. 건강을 잘 챙기고 계십니다. 🛡️";
     } else if (alertType.contains("등록:")) {
-      smsContent = "[가온 안심알림] 부모님께서 새로운 일정을 등록하셨습니다: ${alertType.split(':').last.trim()} 🔔";
+      smsContent =
+          "[가온 안심알림] 부모님께서 새로운 일정을 등록하셨습니다: ${alertType.split(':').last.trim()} 🔔";
     } else {
       smsContent = "[가온 안심알림] 알림: $alertType";
     }
 
-    ApiService.sendSms(_guardianNumbers, smsContent).then((value) {
-      debugPrint("가상 SMS 백엔드 전송 성공: $value");
-    }).catchError((err) {
-      debugPrint("가상 SMS 백엔드 전송 에러: $err");
-    });
-    
+    String deliveryTitle = "안심 문자 요청 완료 ✉️";
+    String deliveryMessage =
+        "보호자 연락처 ($targetNames)로\n'$alertType' 안심 알림 문자를 요청했습니다.";
+    try {
+      final value = await ApiService.sendSms(_guardianNumbers, smsContent);
+      final mode = value['mode'] ?? 'mock';
+      debugPrint("SMS 백엔드 전송 성공: $value");
+      if (mode == 'live') {
+        deliveryTitle = "안심 문자 발송 완료 ✉️";
+        deliveryMessage =
+            "보호자 연락처 ($targetNames)로\n'$alertType' 안심 알림 문자를 실제 발송 요청했습니다.\n\n자녀분들이 부모님의 건강 활동 소식을 받고 안심하실 수 있어요! 😊";
+      } else {
+        deliveryTitle = "안심 문자 테스트 완료";
+        deliveryMessage =
+            "보호자 연락처 ($targetNames)로 보낼 문자가 테스트 모드로 기록되었습니다.\n\n실제 문자 발송은 서버에 문자 API 키와 발신번호를 설정하면 바로 사용할 수 있습니다.";
+      }
+    } catch (err) {
+      debugPrint("SMS 백엔드 전송 에러: $err");
+      deliveryTitle = "문자 발송 확인 필요";
+      deliveryMessage = "안심 문자 요청 중 오류가 발생했습니다.\n\n보호자 연락처와 서버 문자 설정을 확인해 주세요.";
+    }
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
-            children: const [
-              Icon(Icons.mail_outline_rounded, color: Color(0xFF28B59E), size: 28),
-              SizedBox(width: 8),
+            children: [
+              const Icon(
+                Icons.mail_outline_rounded,
+                color: Color(0xFF28B59E),
+                size: 28,
+              ),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text("안심 문자 발송 완료 ✉️", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                child: Text(
+                  deliveryTitle,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
           content: Text(
-            "보호자 연락처 ($targetNames)로\n'$alertType' 안심 알림 문자를 성공적으로 발송했습니다.\n\n자녀분들이 부모님의 건강 활동 소식을 받고 안심하실 수 있어요! 😊",
-            style: const TextStyle(fontSize: 18, height: 1.5, color: Colors.black87),
+            deliveryMessage,
+            style: const TextStyle(
+              fontSize: 18,
+              height: 1.5,
+              color: Colors.black87,
+            ),
           ),
           actions: [
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F5A5C),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: () => Navigator.pop(context),
               child: const Text("확인", style: TextStyle(fontSize: 18)),
@@ -1690,26 +2351,26 @@ class _ChatScreenState extends State<ChatScreen> {
   void _scheduleDailyReminders() {
     try {
       final now = DateTime.now();
-      
+
       // 아침 9시 알림 예약
       var morningTime = DateTime(now.year, now.month, now.day, 9, 0, 0);
       if (morningTime.isBefore(now)) {
         morningTime = morningTime.add(const Duration(days: 1));
       }
-      
+
       // 오후 2시 알림 예약
       var afternoonTime = DateTime(now.year, now.month, now.day, 14, 0, 0);
       if (afternoonTime.isBefore(now)) {
         afternoonTime = afternoonTime.add(const Duration(days: 1));
       }
-      
+
       NotificationService.scheduleNotification(
         id: 9991,
         title: "🌸 가온 AI 안부 알림",
         body: "아버님 어머님, 좋은 아침이에요! 오늘 아침약 꼭 챙겨 드세요! 😊",
         scheduledDate: morningTime,
       );
-      
+
       NotificationService.scheduleNotification(
         id: 9992,
         title: "🚶‍♂️ 가온 AI 안부 알림",
@@ -1727,9 +2388,11 @@ class _ChatScreenState extends State<ChatScreen> {
       await _flutterTts.stop(); // 먼저 재생 중인 것 중지
 
       await _flutterTts.setLanguage("ko-KR");
-      await _flutterTts.setSpeechRate(0.5); // 시니어가 듣기 편하도록 속도를 약간 천천히 설정 (기본값 0.5가 적당)
+      await _flutterTts.setSpeechRate(
+        0.5,
+      ); // 시니어가 듣기 편하도록 속도를 약간 천천히 설정 (기본값 0.5가 적당)
       await _flutterTts.setPitch(1.0); // 표준 피치
-      
+
       // 팩트체크용 JSON 문자열이 들어온 경우 요약문과 세부내용만 발음하도록 필터링
       String speakText = text;
       if (text.startsWith('{') && text.contains('category')) {
@@ -1742,20 +2405,24 @@ class _ChatScreenState extends State<ChatScreen> {
           speakText = speakText.replaceAll('\n', ' ');
         } catch (_) {}
       }
-      
+
       setState(() {
         _currentlySpeakingText = text;
       });
 
       await _flutterTts.speak(speakText);
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.volume_up_rounded, color: Colors.white, size: 28),
+              const Icon(
+                Icons.volume_up_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
@@ -1769,7 +2436,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
                 child: const Text(
                   "중지",
-                  style: TextStyle(fontSize: 18, color: Colors.yellowAccent, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.yellowAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -1829,7 +2500,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 backgroundColor: const Color(0xFF0F5A5C),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: () {
                 showModalBottomSheet(
@@ -1849,7 +2522,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         children: [
                           const Text(
                             "🌟 가온 추천 질문 테마",
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E272E)),
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E272E),
+                            ),
                           ),
                           const SizedBox(height: 16),
                           ListView.builder(
@@ -1867,15 +2544,25 @@ class _ChatScreenState extends State<ChatScreen> {
                                   },
                                   borderRadius: BorderRadius.circular(12),
                                   child: Ink(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: cat['bgColor'],
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: cat['color'].withAlpha(40), width: 1.5),
+                                      border: Border.all(
+                                        color: cat['color'].withAlpha(40),
+                                        width: 1.5,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
-                                        Icon(cat['icon'], size: 28, color: cat['color']),
+                                        Icon(
+                                          cat['icon'],
+                                          size: 28,
+                                          color: cat['color'],
+                                        ),
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
@@ -1908,7 +2595,10 @@ class _ChatScreenState extends State<ChatScreen> {
               icon: const Icon(Icons.stars_rounded, size: 22),
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
-                child: Text("가온 추천 질문 🌟", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                child: Text(
+                  "가온 추천 질문 🌟",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ),
@@ -1919,13 +2609,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 backgroundColor: const Color(0xFF16A34A),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: _sendGuardianSafetyAlert,
               icon: const Icon(Icons.mail_rounded, size: 22),
               label: const FittedBox(
                 fit: BoxFit.scaleDown,
-                child: Text("자녀 안심 문자 ✉️", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                child: Text(
+                  "자녀 안심 문자 ✉️",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ),
@@ -1957,7 +2652,7 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         },
       );
-      
+
       if (available) {
         setModalState(() {
           _isListening = true;
@@ -1974,10 +2669,14 @@ class _ChatScreenState extends State<ChatScreen> {
           listenOptions: stt.SpeechListenOptions(localeId: "ko_KR"),
         );
       } else {
-        debugPrint("The user has denied the use of speech recognition or it's not available.");
+        debugPrint(
+          "The user has denied the use of speech recognition or it's not available.",
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("음성 인식을 시작할 수 없습니다. 마이크 권한을 확인해 주세요.")),
+            const SnackBar(
+              content: Text("음성 인식을 시작할 수 없습니다. 마이크 권한을 확인해 주세요."),
+            ),
           );
         }
       }
@@ -2021,7 +2720,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: SingleChildScrollView(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -2035,13 +2737,17 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      
+
                       // 녹음 상태 및 파형 애니메이션
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (_isListening) ...[
-                            const Icon(Icons.graphic_eq_rounded, size: 40, color: Color(0xFF28B59E)),
+                            const Icon(
+                              Icons.graphic_eq_rounded,
+                              size: 40,
+                              color: Color(0xFF28B59E),
+                            ),
                             const SizedBox(width: 8),
                           ],
                           GestureDetector(
@@ -2054,32 +2760,48 @@ class _ChatScreenState extends State<ChatScreen> {
                                     : const Color(0xFF0F5A5C).withAlpha(30),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: _isListening ? const Color(0xFF28B59E) : const Color(0xFF0F5A5C),
+                                  color: _isListening
+                                      ? const Color(0xFF28B59E)
+                                      : const Color(0xFF0F5A5C),
                                   width: 3,
                                 ),
                               ),
                               child: Icon(
-                                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                                _isListening
+                                    ? Icons.mic_rounded
+                                    : Icons.mic_none_rounded,
                                 size: 54,
-                                color: _isListening ? const Color(0xFF28B59E) : const Color(0xFF0F5A5C),
+                                color: _isListening
+                                    ? const Color(0xFF28B59E)
+                                    : const Color(0xFF0F5A5C),
                               ),
                             ),
                           ),
                           if (_isListening) ...[
                             const SizedBox(width: 8),
-                            const Icon(Icons.graphic_eq_rounded, size: 40, color: Color(0xFF28B59E)),
+                            const Icon(
+                              Icons.graphic_eq_rounded,
+                              size: 40,
+                              color: Color(0xFF28B59E),
+                            ),
                           ],
                         ],
                       ),
                       const SizedBox(height: 16),
-                      
+
                       Text(
-                        _isListening ? "아버님 어머님, 듣고 있어요! 편하게 말씀하세요 🎙️" : "아래 마이크를 누르고 말씀해 보세요.",
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F5A5C)),
+                        _isListening
+                            ? "아버님 어머님, 듣고 있어요! 편하게 말씀하세요 🎙️"
+                            : "아래 마이크를 누르고 말씀해 보세요.",
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F5A5C),
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // 실시간 인식 내용 텍스트 박스
                       Container(
                         width: double.infinity,
@@ -2095,11 +2817,15 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                         child: SingleChildScrollView(
                           child: Text(
-                            _speechText.isEmpty ? "여기에 말씀하신 내용이 나옵니다." : _speechText,
+                            _speechText.isEmpty
+                                ? "여기에 말씀하신 내용이 나옵니다."
+                                : _speechText,
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: _speechText.isEmpty ? Colors.black38 : const Color(0xFF1E272E),
+                              color: _speechText.isEmpty
+                                  ? Colors.black38
+                                  : const Color(0xFF1E272E),
                               height: 1.4,
                             ),
                             textAlign: TextAlign.center,
@@ -2107,15 +2833,20 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      
+
                       // 액션 제어 버튼 (닫기, 다시 말하기, 보내기)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           OutlinedButton(
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 20,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             onPressed: () {
                               if (_isListening) {
@@ -2123,13 +2854,24 @@ class _ChatScreenState extends State<ChatScreen> {
                               }
                               Navigator.pop(context);
                             },
-                            child: const Text("닫기", style: TextStyle(fontSize: 18, color: Colors.blueGrey)),
+                            child: const Text(
+                              "닫기",
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.blueGrey,
+                              ),
+                            ),
                           ),
                           if (_speechText.isNotEmpty)
                             OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 20,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                               onPressed: () {
                                 setModalState(() {
@@ -2137,14 +2879,25 @@ class _ChatScreenState extends State<ChatScreen> {
                                 });
                                 _toggleListening(setModalState);
                               },
-                              child: const Text("다시 말하기", style: TextStyle(fontSize: 18, color: Color(0xFF0F5A5C))),
+                              child: const Text(
+                                "다시 말하기",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Color(0xFF0F5A5C),
+                                ),
+                              ),
                             ),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF0F5A5C),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 30,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             onPressed: _speechText.isEmpty
                                 ? null
@@ -2156,14 +2909,17 @@ class _ChatScreenState extends State<ChatScreen> {
                                     Navigator.pop(context);
                                     _sendMessage();
                                   },
-                            child: const Text("보내기", style: TextStyle(fontSize: 18)),
+                            child: const Text(
+                              "보내기",
+                              style: TextStyle(fontSize: 18),
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 20),
                       Divider(color: Colors.grey[200]),
                       const SizedBox(height: 10),
-                      
+
                       const Text(
                         "💡 자주 하시는 질문을 바로 선택하셔도 좋습니다:",
                         style: TextStyle(fontSize: 16, color: Colors.black54),
@@ -2175,7 +2931,13 @@ class _ChatScreenState extends State<ChatScreen> {
                         alignment: WrapAlignment.center,
                         children: [
                           ActionChip(
-                            label: const Text("☀️ 오늘 날씨 어때?", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                            label: const Text(
+                              "☀️ 오늘 날씨 어때?",
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             backgroundColor: Colors.white,
                             onPressed: () {
                               if (_isListening) _speech.stop();
@@ -2185,7 +2947,13 @@ class _ChatScreenState extends State<ChatScreen> {
                             },
                           ),
                           ActionChip(
-                            label: const Text("💊 아침 약 복용 확인", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                            label: const Text(
+                              "💊 아침 약 복용 확인",
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             backgroundColor: Colors.white,
                             onPressed: () {
                               if (_isListening) _speech.stop();
@@ -2195,7 +2963,13 @@ class _ChatScreenState extends State<ChatScreen> {
                             },
                           ),
                           ActionChip(
-                            label: const Text("⏰ 1분 뒤 약먹기 알람", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                            label: const Text(
+                              "⏰ 1분 뒤 약먹기 알람",
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             backgroundColor: Colors.white,
                             onPressed: () {
                               if (_isListening) _speech.stop();
@@ -2213,12 +2987,13 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           },
         );
-      }).then((_) {
-        // 바텀시트가 닫힐 때 음성인식이 계속 돌고 있다면 안전하게 정지
-        if (_speech.isListening) {
-          _speech.stop();
-        }
-      });
+      },
+    ).then((_) {
+      // 바텀시트가 닫힐 때 음성인식이 계속 돌고 있다면 안전하게 정지
+      if (_speech.isListening) {
+        _speech.stop();
+      }
+    });
   }
 }
 
@@ -2236,7 +3011,8 @@ class FactCheckDetailsExpander extends StatefulWidget {
   });
 
   @override
-  State<FactCheckDetailsExpander> createState() => _FactCheckDetailsExpanderState();
+  State<FactCheckDetailsExpander> createState() =>
+      _FactCheckDetailsExpanderState();
 }
 
 class _FactCheckDetailsExpanderState extends State<FactCheckDetailsExpander> {
@@ -2271,7 +3047,9 @@ class _FactCheckDetailsExpanderState extends State<FactCheckDetailsExpander> {
                   ),
                 ),
                 Icon(
-                  _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                  _isExpanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
                   color: widget.borderColor,
                   size: 24,
                 ),

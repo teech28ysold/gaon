@@ -1,7 +1,14 @@
+import hashlib
+import hmac
+import json
 import os
 import sys
 import sqlite3
+import urllib.error
+import urllib.request
+import uuid
 from datetime import datetime
+from typing import Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -37,7 +44,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "chat.db")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 client = None
 if GEMINI_API_KEY:
-    print("LOADED API KEY FOR CLIENT:", GEMINI_API_KEY[:10] + "..." if GEMINI_API_KEY else "None")
+    print("Gemini API client configured.")
     client = genai.Client(api_key=GEMINI_API_KEY)
 
 # 데이터베이스 및 테이블 초기화
@@ -73,8 +80,8 @@ init_db()
 
 class ChatRequest(BaseModel):
     message: str
-    latitude: float = None
-    longitude: float = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class SmsRequest(BaseModel):
     receivers: list[str]
@@ -85,18 +92,65 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def normalize_phone_number(phone: str) -> str:
+    return "".join(ch for ch in phone if ch.isdigit())
+
+def send_solapi_sms(receivers: list[str], message: str) -> dict:
+    api_key = os.getenv("SOLAPI_API_KEY")
+    api_secret = os.getenv("SOLAPI_API_SECRET")
+    from_number = normalize_phone_number(os.getenv("SOLAPI_FROM_NUMBER", ""))
+
+    if not api_key or not api_secret or not from_number:
+        return {"sent": False, "reason": "SOLAPI 환경변수가 설정되지 않았습니다."}
+
+    date = datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
+    salt = uuid.uuid4().hex
+    signature = hmac.new(
+        api_secret.encode("utf-8"),
+        f"{date}{salt}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    payload = {
+        "messages": [
+            {
+                "to": normalize_phone_number(receiver),
+                "from": from_number,
+                "text": message,
+            }
+            for receiver in receivers
+        ]
+    }
+
+    request = urllib.request.Request(
+        "https://api.solapi.com/messages/v4/send-many",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": (
+                f"HMAC-SHA256 apiKey={api_key}, date={date}, salt={salt}, signature={signature}"
+            ),
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            body = response.read().decode("utf-8")
+            return {
+                "sent": True,
+                "provider": "solapi",
+                "response": json.loads(body) if body else {},
+            }
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")
+        raise HTTPException(status_code=502, detail=f"Solapi 문자 발송 실패: {detail}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Solapi 문자 발송 오류: {str(e)}")
+
 @app.get("/")
 def read_root():
     return {"message": "가온 AI 비서 백엔드 서버가 작동 중입니다."}
-
-@app.get("/api/debug-key")
-def get_debug_key():
-    key = os.getenv("GEMINI_API_KEY")
-    return {
-        "key_prefix": key[:10] + "..." if key else "None",
-        "key_length": len(key) if key else 0,
-        "client_configured": client is not None
-    }
 
 # 1. 대화 내역 전체 조회 API
 @app.get("/api/history")
@@ -549,10 +603,11 @@ def clear_chat_history():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"데이터 초기화 오류: {str(e)}")
 
-# 5. 가상 SMS 발송 API (실제 SMS API 연동을 위한 백본 마련)
+# 5. 보호자 SMS 발송 API (Solapi 설정 시 실제 발송, 미설정 시 테스트 모드)
 @app.post("/api/send-sms")
 def send_virtual_sms(request: SmsRequest):
-    receivers = request.receivers
+    receivers = [normalize_phone_number(receiver) for receiver in request.receivers]
+    receivers = [receiver for receiver in receivers if receiver]
     message = request.message
     
     if not receivers:
@@ -560,16 +615,30 @@ def send_virtual_sms(request: SmsRequest):
     if not message:
         raise HTTPException(status_code=400, detail="메시지 내용이 비어있습니다.")
         
+    solapi_result = send_solapi_sms(receivers, message)
+    if solapi_result.get("sent"):
+        return {
+            "status": "success",
+            "mode": "live",
+            "provider": solapi_result.get("provider"),
+            "message": "안심 문자가 실제로 발송 요청되었습니다.",
+            "receivers": receivers,
+            "content": message,
+            "provider_response": solapi_result.get("response"),
+        }
+
     print("\n" + "=" * 50)
-    print("[SMS 발송 시뮬레이션]")
+    print("[SMS 테스트 모드]")
     print(f"시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"수신처: {', '.join(receivers)}")
     print(f"내용:\n{message}")
+    print(f"사유: {solapi_result.get('reason')}")
     print("=" * 50 + "\n")
     
     return {
         "status": "success",
-        "message": "안심 문자가 성공적으로 발송되었습니다. (가상 발송 완료)",
+        "mode": "mock",
+        "message": "안심 문자가 테스트 모드로 기록되었습니다. 실제 발송은 Solapi 설정 후 가능합니다.",
         "receivers": receivers,
         "content": message
     }

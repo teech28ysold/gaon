@@ -6,13 +6,21 @@ import 'package:flutter/foundation.dart' show debugPrint;
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  static bool _timeZoneInitialized = false;
+
+  static void _ensureTimeZoneInitialized() {
+    if (_timeZoneInitialized) return;
+
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
+    _timeZoneInitialized = true;
+  }
 
   // 초기화 함수
   static Future<void> init() async {
     // 1) 타임존 데이터 로드 및 로컬 타임존 설정 (기본값 서울)
     try {
-      tz.initializeTimeZones();
-      tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
+      _ensureTimeZoneInitialized();
     } catch (e) {
       debugPrint("타임존 설정 실패: $e");
     }
@@ -25,15 +33,16 @@ class NotificationService {
       // 3) iOS 초기화 설정
       const DarwinInitializationSettings initializationSettingsDarwin =
           DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
-      );
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          );
 
-      const InitializationSettings initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
-        iOS: initializationSettingsDarwin,
-      );
+      const InitializationSettings initializationSettings =
+          InitializationSettings(
+            android: initializationSettingsAndroid,
+            iOS: initializationSettingsDarwin,
+          );
 
       // 4) 플러그인 초기화 실행 (v21.0.0에서 settings 파라미터는 named parameter임)
       await _notificationsPlugin.initialize(
@@ -44,8 +53,10 @@ class NotificationService {
       );
 
       // 5) Android 13 이상 권한 명시적 요청
-      final androidPlugin = _notificationsPlugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (androidPlugin != null) {
         await androidPlugin.requestNotificationsPermission();
         try {
@@ -66,37 +77,47 @@ class NotificationService {
     required String body,
     required DateTime scheduledDate,
   }) async {
+    _ensureTimeZoneInitialized();
+
     // DateTime을 Timezone 패키지 전용 TZDateTime 객체로 변환
-    final tz.TZDateTime tzDateTime = tz.TZDateTime.from(scheduledDate, tz.local);
+    final tz.TZDateTime tzDateTime = tz.TZDateTime.from(
+      scheduledDate,
+      tz.local,
+    );
 
     // 이미 지난 시간이면 등록하지 않고 리턴
     if (tzDateTime.isBefore(tz.TZDateTime.now(tz.local))) {
       return;
     }
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'schedule_channel_id', // 채널 ID
-      '가온 일정 알림', // 채널 이름
-      channelDescription: '가온 AI 비서의 일정 알림 채널입니다.',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-      playSound: true,
-    );
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'schedule_channel_id', // 채널 ID
+          '가온 일정 알림', // 채널 이름
+          channelDescription: '가온 AI 비서의 일정 알림 채널입니다.',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: true,
+          playSound: true,
+        );
 
     const NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
     );
 
     // 알림 예약 실행 (v21.0.0에서는 모든 인자가 named parameter임)
-    await _notificationsPlugin.zonedSchedule(
-      id: id,
-      title: title,
-      body: body,
-      scheduledDate: tzDateTime,
-      notificationDetails: platformDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    );
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: tzDateTime,
+        notificationDetails: platformDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+    } catch (e) {
+      debugPrint("알림 예약 실패: $e");
+    }
   }
 
   // 예약된 특정 알림 취소 함수

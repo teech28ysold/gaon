@@ -8,10 +8,15 @@ class ApiService {
     return 'https://gaon-l0t5.onrender.com';
   }
 
+  static const Duration _shortTimeout = Duration(seconds: 15);
+  static const Duration _longTimeout = Duration(seconds: 60);
+
   // 1. 대화 내역 가져오기
   static Future<List<Map<String, dynamic>>> getHistory() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/history'));
+      final response = await http
+          .get(Uri.parse('$baseUrl/api/history'))
+          .timeout(_shortTimeout);
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
         return data.map((item) => Map<String, dynamic>.from(item)).toList();
@@ -35,15 +40,19 @@ class ApiService {
         'latitude': ?latitude,
         'longitude': ?longitude,
       };
-      
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(bodyMap),
-      );
-      
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/chat'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(bodyMap),
+          )
+          .timeout(_longTimeout);
+
       if (response.statusCode == 200) {
-        return Map<String, dynamic>.from(json.decode(utf8.decode(response.bodyBytes)));
+        return Map<String, dynamic>.from(
+          json.decode(utf8.decode(response.bodyBytes)),
+        );
       } else {
         throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
       }
@@ -55,7 +64,9 @@ class ApiService {
   // 3. 대화 내역 전체 초기화
   static Future<void> clearHistory() async {
     try {
-      final response = await http.post(Uri.parse('$baseUrl/api/chat/clear'));
+      final response = await http
+          .post(Uri.parse('$baseUrl/api/chat/clear'))
+          .timeout(_shortTimeout);
       if (response.statusCode != 200) {
         throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
       }
@@ -65,11 +76,14 @@ class ApiService {
   }
 
   // 4. 이미지 전송 및 가온 AI 분석 응답 획득
-  static Future<Map<String, dynamic>> sendChatImage(List<int> bytes, String filename) async {
+  static Future<Map<String, dynamic>> sendChatImage(
+    List<int> bytes,
+    String filename,
+  ) async {
     try {
       final uri = Uri.parse('$baseUrl/api/chat/image');
       final request = http.MultipartRequest('POST', uri);
-      
+
       final ext = filename.split('.').last.toLowerCase();
       var mimeType = 'image/jpeg';
       if (ext == 'png') {
@@ -89,12 +103,14 @@ class ApiService {
           contentType: MediaType.parse(mimeType),
         ),
       );
-      
-      final streamedResponse = await request.send();
+
+      final streamedResponse = await request.send().timeout(_longTimeout);
       final response = await http.Response.fromStream(streamedResponse);
-      
+
       if (response.statusCode == 200) {
-        return Map<String, dynamic>.from(json.decode(utf8.decode(response.bodyBytes)));
+        return Map<String, dynamic>.from(
+          json.decode(utf8.decode(response.bodyBytes)),
+        );
       } else {
         throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
       }
@@ -104,18 +120,22 @@ class ApiService {
   }
 
   // 5. 가상 안심 문자 발송 요청
-  static Future<Map<String, dynamic>> sendSms(List<String> receivers, String message) async {
+  static Future<Map<String, dynamic>> sendSms(
+    List<String> receivers,
+    String message,
+  ) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/send-sms'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'receivers': receivers,
-          'message': message,
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/send-sms'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'receivers': receivers, 'message': message}),
+          )
+          .timeout(_shortTimeout);
       if (response.statusCode == 200) {
-        return Map<String, dynamic>.from(json.decode(utf8.decode(response.bodyBytes)));
+        return Map<String, dynamic>.from(
+          json.decode(utf8.decode(response.bodyBytes)),
+        );
       } else {
         throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
       }
