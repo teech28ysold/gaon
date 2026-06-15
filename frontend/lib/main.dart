@@ -946,85 +946,87 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                "약과 일정 알림",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: scheduleController,
-                style: const TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "약과 일정 알림",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-                decoration: const InputDecoration(
-                  hintText: "예: 오늘 저녁 8시에 혈압약 알림",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ActionChip(
-                    label: const Text(
-                      "1분 뒤 약 알림",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _sendMessage(customText: "1분 뒤에 약 먹기 알림 등록해줘");
-                    },
+                const SizedBox(height: 12),
+                TextField(
+                  controller: scheduleController,
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
                   ),
-                  ActionChip(
-                    label: const Text(
-                      "오늘 저녁 8시",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _sendMessage(customText: "오늘 저녁 8시에 약 먹기 알림 등록해줘");
-                    },
+                  decoration: const InputDecoration(
+                    hintText: "예: 오늘 저녁 8시에 혈압약 알림",
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: () {
-                  final text = scheduleController.text.trim();
-                  if (text.isEmpty) return;
-                  Navigator.pop(context);
-                  _sendMessage(customText: text);
-                },
-                child: const Text(
-                  "알림 등록하기",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ActionChip(
+                      label: const Text(
+                        "1분 뒤 약 알림",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _sendMessage(customText: "1분 뒤에 약 먹기 알림 등록해줘");
+                      },
+                    ),
+                    ActionChip(
+                      label: const Text(
+                        "오늘 저녁 8시",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _sendMessage(customText: "오늘 저녁 8시에 약 먹기 알림 등록해줘");
+                      },
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () {
+                    final text = scheduleController.text.trim();
+                    if (text.isEmpty) return;
+                    Navigator.pop(context);
+                    _sendMessage(customText: text);
+                  },
+                  child: const Text(
+                    "알림 등록하기",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -1150,6 +1152,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showShortcutQuestions(Map<String, dynamic> category) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
@@ -1159,77 +1162,83 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       builder: (BuildContext context) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(category['icon'], color: category['color'], size: 30),
-                    const SizedBox(width: 8),
-                    Text(
-                      "${category['title']} 추천 질문",
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E272E),
+          child: FractionallySizedBox(
+            heightFactor: 0.82,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        category['icon'],
+                        color: category['color'],
+                        size: 30,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  "가온 비서에게 물어보고 싶은 문장을 터치해 보세요.",
-                  style: TextStyle(fontSize: 15.5, color: Colors.grey),
-                ),
-                const SizedBox(height: 16),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: (category['questions'] as List).length,
-                    itemBuilder: (context, index) {
-                      final question = category['questions'][index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF1E272E),
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                            side: BorderSide(
-                              color: category['color'].withAlpha(60),
-                              width: 1.5,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            alignment: Alignment.centerLeft,
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _textController.text = question;
-                            _sendMessage();
-                          },
-                          child: Text(
-                            question,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              height: 1.4,
-                            ),
-                          ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "${category['title']} 추천 질문",
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E272E),
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  const Text(
+                    "가온 비서에게 물어보고 싶은 문장을 터치해 보세요.",
+                    style: TextStyle(fontSize: 15.5, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      itemCount: (category['questions'] as List).length,
+                      itemBuilder: (context, index) {
+                        final question = category['questions'][index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFF1E272E),
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              side: BorderSide(
+                                color: category['color'].withAlpha(60),
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              alignment: Alignment.centerLeft,
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _textController.text = question;
+                              _sendMessage();
+                            },
+                            child: Text(
+                              question,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1850,147 +1859,149 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               content: SizedBox(
                 width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "자녀분들의 연락처를 등록해 주세요. 일정이 예약되거나 안심 알림 시 등록된 모든 연락처로 문자가 발송됩니다.",
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        height: 1.4,
-                        color: Colors.black87,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "자녀분들의 연락처를 등록해 주세요. 일정이 예약되거나 안심 알림 시 등록된 모든 연락처로 문자가 발송됩니다.",
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          height: 1.4,
+                          color: Colors.black87,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                    // 등록된 연락처 리스트
-                    if (_guardianNumbers.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                          child: Text(
-                            "등록된 보호자 연락처가 없습니다.",
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.black38,
-                              fontWeight: FontWeight.bold,
+                      // 등록된 연락처 리스트
+                      if (_guardianNumbers.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: Text(
+                              "등록된 보호자 연락처가 없습니다.",
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.black38,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
+                        )
+                      else
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _guardianNumbers.length,
+                            itemBuilder: (context, index) {
+                              final number = _guardianNumbers[index];
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F4F6),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      number,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1F2937),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: Colors.redAccent,
+                                        size: 22,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _guardianNumbers.removeAt(index);
+                                        });
+                                        setDialogState(() {}); // 다이얼로그 상태 갱신
+                                        _saveGuardianNumbers();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      )
-                    else
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 180),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _guardianNumbers.length,
-                          itemBuilder: (context, index) {
-                            final number = _guardianNumbers[index];
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
+                      const SizedBox(height: 12),
+                      const Divider(),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: newNumberController,
+                              keyboardType: TextInputType.phone,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3F4F6),
+                              decoration: const InputDecoration(
+                                labelText: "새 보호자 번호",
+                                labelStyle: TextStyle(fontSize: 14),
+                                hintText: "예: 010-1234-5678",
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F5A5C),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    number,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1F2937),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete_outline_rounded,
-                                      color: Colors.redAccent,
-                                      size: 22,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _guardianNumbers.removeAt(index);
-                                      });
-                                      setDialogState(() {}); // 다이얼로그 상태 갱신
-                                      _saveGuardianNumbers();
-                                    },
-                                  ),
-                                ],
+                            ),
+                            onPressed: () {
+                              final newNum = newNumberController.text.trim();
+                              if (newNum.isNotEmpty) {
+                                setState(() {
+                                  if (!_guardianNumbers.contains(newNum)) {
+                                    _guardianNumbers.add(newNum);
+                                  }
+                                });
+                                setDialogState(() {});
+                                newNumberController.clear();
+                                _saveGuardianNumbers();
+                              }
+                            },
+                            child: const Text(
+                              "추가",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          ),
+                        ],
                       ),
-                    const SizedBox(height: 12),
-                    const Divider(),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: newNumberController,
-                            keyboardType: TextInputType.phone,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: const InputDecoration(
-                              labelText: "새 보호자 번호",
-                              labelStyle: TextStyle(fontSize: 14),
-                              hintText: "예: 010-1234-5678",
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0F5A5C),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () {
-                            final newNum = newNumberController.text.trim();
-                            if (newNum.isNotEmpty) {
-                              setState(() {
-                                if (!_guardianNumbers.contains(newNum)) {
-                                  _guardianNumbers.add(newNum);
-                                }
-                              });
-                              setDialogState(() {});
-                              newNumberController.clear();
-                              _saveGuardianNumbers();
-                            }
-                          },
-                          child: const Text(
-                            "추가",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -2266,6 +2277,7 @@ class _ChatScreenState extends State<ChatScreen> {
               onPressed: () {
                 showModalBottomSheet(
                   context: context,
+                  isScrollControlled: true,
                   backgroundColor: Colors.white,
                   shape: const RoundedRectangleBorder(
                     borderRadius: BorderRadius.only(
@@ -2274,40 +2286,43 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   builder: (context) => SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            "🌟 가온 추천 질문 테마",
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E272E),
+                    child: FractionallySizedBox(
+                      heightFactor: 0.74,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            const Text(
+                              "🌟 가온 추천 질문 테마",
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E272E),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _shortcutCategories.length,
-                            itemBuilder: (context, index) {
-                              final cat = _shortcutCategories[index];
-                              return SeniorCategoryCard(
-                                icon: cat['icon'],
-                                title: cat['title'],
-                                color: cat['color'],
-                                backgroundColor: cat['bgColor'],
-                                animationIndex: index,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _showShortcutQuestions(cat);
+                            const SizedBox(height: 16),
+                            Expanded(
+                              child: ListView.builder(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                itemCount: _shortcutCategories.length,
+                                itemBuilder: (context, index) {
+                                  final cat = _shortcutCategories[index];
+                                  return SeniorCategoryCard(
+                                    icon: cat['icon'],
+                                    title: cat['title'],
+                                    color: cat['color'],
+                                    backgroundColor: cat['bgColor'],
+                                    animationIndex: index,
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _showShortcutQuestions(cat);
+                                    },
+                                  );
                                 },
-                              );
-                            },
-                          ),
-                        ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
