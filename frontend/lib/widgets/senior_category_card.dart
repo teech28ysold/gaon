@@ -50,7 +50,15 @@ class SeniorCategoryCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(title, style: GaonTextStyles.title),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              style: GaonTextStyles.title,
+                            ),
+                          ),
                           if (subtitle != null) ...[
                             const SizedBox(height: 6),
                             Text(

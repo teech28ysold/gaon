@@ -1732,95 +1732,109 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       child: SafeArea(
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // 1. 카메라 버튼
-            _buildCircularIconButton(
-              icon: Icons.camera_alt_rounded,
-              color: GaonColors.deepTeal,
-              tooltip: "카메라 찍기",
-              onPressed: _pickAndSendImage,
-            ),
-            const SizedBox(width: 10),
-
-            // 2. 마이크 버튼
-            _buildCircularIconButton(
-              icon: Icons.mic_rounded,
-              color: GaonColors.deepTeal,
-              tooltip: "목소리로 말하기",
-              onPressed: _showVoiceDialog,
-            ),
-            const SizedBox(width: 10),
-
-            // 3. 텍스트 입력창
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: const Color(0xFFD1D5DB),
-                    width: 1.5,
-                  ),
-                ),
-                child: TextField(
-                  controller: _textController,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: "가온에게 물어보세요...",
-                    hintStyle: TextStyle(fontSize: 20, color: Colors.black45),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 12,
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.camera_alt_rounded, size: 28),
+                    label: const Text("사진 찍기"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: GaonColors.deepTeal,
+                      minimumSize: const Size.fromHeight(52),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      side: const BorderSide(
+                        color: GaonColors.deepTeal,
+                        width: 1.5,
+                      ),
                     ),
-                    border: InputBorder.none,
-                    isDense: true,
+                    onPressed: _pickAndSendImage,
                   ),
-                  onSubmitted: (_) => _sendMessage(),
                 ),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.mic_rounded, size: 28),
+                    label: const Text("말로 질문"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: GaonColors.deepTeal,
+                      minimumSize: const Size.fromHeight(52),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      side: const BorderSide(
+                        color: GaonColors.deepTeal,
+                        width: 1.5,
+                      ),
+                    ),
+                    onPressed: _showVoiceDialog,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-
-            // 4. 전송 버튼
-            _buildCircularIconButton(
-              icon: Icons.send_rounded,
-              color: GaonColors.deepTeal,
-              tooltip: "보내기",
-              onPressed: () => _sendMessage(),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF9CA3AF),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: TextField(
+                      controller: _textController,
+                      minLines: 2,
+                      maxLines: 4,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      style: const TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.bold,
+                        height: 1.35,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: "질문을 크게 입력해 주세요",
+                        hintStyle: TextStyle(
+                          fontSize: 19,
+                          color: Colors.black45,
+                        ),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: IconButton.filled(
+                    icon: const Icon(Icons.send_rounded, size: 30),
+                    color: Colors.white,
+                    style: IconButton.styleFrom(
+                      backgroundColor: GaonColors.deepTeal,
+                    ),
+                    tooltip: "보내기",
+                    onPressed: () => _sendMessage(),
+                  ),
+                ),
+              ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // 공용 동그란 아이콘 버튼 헬퍼
-  Widget _buildCircularIconButton({
-    required IconData icon,
-    required Color color,
-    required String tooltip,
-    required VoidCallback onPressed,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: Tooltip(
-        message: tooltip,
-        textStyle: const TextStyle(fontSize: 16, color: Colors.white),
-        child: InkWell(
-          onTap: onPressed,
-          customBorder: const CircleBorder(),
-          child: Ink(
-            padding: const EdgeInsets.all(17),
-            decoration: BoxDecoration(
-              color: color.withAlpha(31),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 30),
-          ),
         ),
       ),
     );
@@ -2436,273 +2450,283 @@ class _ChatScreenState extends State<ChatScreen> {
               });
             }
 
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom, // 키보드 대응 여백
-              ),
-              child: SingleChildScrollView(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 20,
+            return SafeArea(
+              child: FractionallySizedBox(
+                heightFactor: 0.92,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 드래그 핸들
-                      Container(
-                        width: 50,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                  child: SingleChildScrollView(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 20,
                       ),
-                      const SizedBox(height: 20),
-
-                      // 녹음 상태 및 파형 애니메이션
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (_isListening) ...[
-                            const Icon(
-                              Icons.graphic_eq_rounded,
-                              size: 40,
-                              color: Color(0xFF28B59E),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          GestureDetector(
-                            onTap: () => _toggleListening(setModalState),
-                            child: Ink(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: _isListening
-                                    ? const Color(0xFF28B59E).withAlpha(40)
-                                    : const Color(0xFF0F5A5C).withAlpha(30),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _isListening
-                                      ? const Color(0xFF28B59E)
-                                      : const Color(0xFF0F5A5C),
-                                  width: 3,
-                                ),
-                              ),
-                              child: Icon(
-                                _isListening
-                                    ? Icons.mic_rounded
-                                    : Icons.mic_none_rounded,
-                                size: 54,
-                                color: _isListening
-                                    ? const Color(0xFF28B59E)
-                                    : const Color(0xFF0F5A5C),
-                              ),
+                          // 드래그 핸들
+                          Container(
+                            width: 50,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          if (_isListening) ...[
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.graphic_eq_rounded,
-                              size: 40,
-                              color: Color(0xFF28B59E),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 16),
+                          const SizedBox(height: 20),
 
-                      Text(
-                        _isListening
-                            ? "아버님 어머님, 듣고 있어요! 편하게 말씀하세요 🎙️"
-                            : "아래 마이크를 누르고 말씀해 보세요.",
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F5A5C),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
+                          // 녹음 상태 및 파형 애니메이션
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (_isListening) ...[
+                                const Icon(
+                                  Icons.graphic_eq_rounded,
+                                  size: 40,
+                                  color: Color(0xFF28B59E),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              GestureDetector(
+                                onTap: () => _toggleListening(setModalState),
+                                child: Ink(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: _isListening
+                                        ? const Color(0xFF28B59E).withAlpha(40)
+                                        : const Color(0xFF0F5A5C).withAlpha(30),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: _isListening
+                                          ? const Color(0xFF28B59E)
+                                          : const Color(0xFF0F5A5C),
+                                      width: 3,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    _isListening
+                                        ? Icons.mic_rounded
+                                        : Icons.mic_none_rounded,
+                                    size: 54,
+                                    color: _isListening
+                                        ? const Color(0xFF28B59E)
+                                        : const Color(0xFF0F5A5C),
+                                  ),
+                                ),
+                              ),
+                              if (_isListening) ...[
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Icons.graphic_eq_rounded,
+                                  size: 40,
+                                  color: Color(0xFF28B59E),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 16),
 
-                      // 실시간 인식 내용 텍스트 박스
-                      Container(
-                        width: double.infinity,
-                        constraints: const BoxConstraints(
-                          minHeight: 100,
-                          maxHeight: 140,
-                        ),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE5E7EB)),
-                        ),
-                        child: SingleChildScrollView(
-                          child: Text(
-                            _speechText.isEmpty
-                                ? "여기에 말씀하신 내용이 나옵니다."
-                                : _speechText,
-                            style: TextStyle(
-                              fontSize: 22,
+                          Text(
+                            _isListening
+                                ? "아버님 어머님, 듣고 있어요! 편하게 말씀하세요 🎙️"
+                                : "아래 마이크를 누르고 말씀해 보세요.",
+                            style: const TextStyle(
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: _speechText.isEmpty
-                                  ? Colors.black38
-                                  : const Color(0xFF1E272E),
-                              height: 1.4,
+                              color: Color(0xFF0F5A5C),
                             ),
                             textAlign: TextAlign.center,
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
+                          const SizedBox(height: 16),
 
-                      // 액션 제어 버튼 (닫기, 다시 말하기, 보내기)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                                horizontal: 20,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          // 실시간 인식 내용 텍스트 박스
+                          Container(
+                            width: double.infinity,
+                            constraints: const BoxConstraints(
+                              minHeight: 100,
+                              maxHeight: 140,
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
                               ),
                             ),
-                            onPressed: () {
-                              if (_isListening) {
-                                _speech.stop();
-                              }
-                              Navigator.pop(context);
-                            },
-                            child: const Text(
-                              "닫기",
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.blueGrey,
-                              ),
-                            ),
-                          ),
-                          if (_speechText.isNotEmpty)
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 20,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: () {
-                                setModalState(() {
-                                  _speechText = '';
-                                });
-                                _toggleListening(setModalState);
-                              },
-                              child: const Text(
-                                "다시 말하기",
+                            child: SingleChildScrollView(
+                              child: Text(
+                                _speechText.isEmpty
+                                    ? "여기에 말씀하신 내용이 나옵니다."
+                                    : _speechText,
                                 style: TextStyle(
-                                  fontSize: 18,
-                                  color: Color(0xFF0F5A5C),
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: _speechText.isEmpty
+                                      ? Colors.black38
+                                      : const Color(0xFF1E272E),
+                                  height: 1.4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // 액션 제어 버튼 (닫기, 다시 말하기, 보내기)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 20,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  if (_isListening) {
+                                    _speech.stop();
+                                  }
+                                  Navigator.pop(context);
+                                },
+                                child: const Text(
+                                  "닫기",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.blueGrey,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F5A5C),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                                horizontal: 30,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: _speechText.isEmpty
-                                ? null
-                                : () {
-                                    if (_isListening) {
-                                      _speech.stop();
-                                    }
-                                    _textController.text = _speechText;
-                                    Navigator.pop(context);
-                                    _sendMessage();
+                              if (_speechText.isNotEmpty)
+                                OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 20,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    setModalState(() {
+                                      _speechText = '';
+                                    });
+                                    _toggleListening(setModalState);
                                   },
-                            child: const Text(
-                              "보내기",
-                              style: TextStyle(fontSize: 18),
-                            ),
+                                  child: const Text(
+                                    "다시 말하기",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Color(0xFF0F5A5C),
+                                    ),
+                                  ),
+                                ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0F5A5C),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 30,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: _speechText.isEmpty
+                                    ? null
+                                    : () {
+                                        if (_isListening) {
+                                          _speech.stop();
+                                        }
+                                        _textController.text = _speechText;
+                                        Navigator.pop(context);
+                                        _sendMessage();
+                                      },
+                                child: const Text(
+                                  "보내기",
+                                  style: TextStyle(fontSize: 18),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      Divider(color: Colors.grey[200]),
-                      const SizedBox(height: 10),
+                          const SizedBox(height: 20),
+                          Divider(color: Colors.grey[200]),
+                          const SizedBox(height: 10),
 
-                      const Text(
-                        "💡 자주 하시는 질문을 바로 선택하셔도 좋습니다:",
-                        style: TextStyle(fontSize: 16, color: Colors.black54),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          ActionChip(
-                            label: const Text(
-                              "☀️ 오늘 날씨 어때?",
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          const Text(
+                            "💡 자주 하시는 질문을 바로 선택하셔도 좋습니다:",
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.black54,
                             ),
-                            backgroundColor: Colors.white,
-                            onPressed: () {
-                              if (_isListening) _speech.stop();
-                              Navigator.pop(context);
-                              _textController.text = "오늘 날씨 어때?";
-                              _sendMessage();
-                            },
                           ),
-                          ActionChip(
-                            label: const Text(
-                              "💊 아침 약 복용 확인",
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              ActionChip(
+                                label: const Text(
+                                  "☀️ 오늘 날씨 어때?",
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                backgroundColor: Colors.white,
+                                onPressed: () {
+                                  if (_isListening) _speech.stop();
+                                  Navigator.pop(context);
+                                  _textController.text = "오늘 날씨 어때?";
+                                  _sendMessage();
+                                },
                               ),
-                            ),
-                            backgroundColor: Colors.white,
-                            onPressed: () {
-                              if (_isListening) _speech.stop();
-                              Navigator.pop(context);
-                              _textController.text = "오늘 아침 약 먹은 기록 확인해줘";
-                              _sendMessage();
-                            },
-                          ),
-                          ActionChip(
-                            label: const Text(
-                              "⏰ 1분 뒤 약먹기 알람",
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
+                              ActionChip(
+                                label: const Text(
+                                  "💊 아침 약 복용 확인",
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                backgroundColor: Colors.white,
+                                onPressed: () {
+                                  if (_isListening) _speech.stop();
+                                  Navigator.pop(context);
+                                  _textController.text = "오늘 아침 약 먹은 기록 확인해줘";
+                                  _sendMessage();
+                                },
                               ),
-                            ),
-                            backgroundColor: Colors.white,
-                            onPressed: () {
-                              if (_isListening) _speech.stop();
-                              Navigator.pop(context);
-                              _textController.text = "1분 뒤에 아침약 복용 알람 등록해줘";
-                              _sendMessage();
-                            },
+                              ActionChip(
+                                label: const Text(
+                                  "⏰ 1분 뒤 약먹기 알람",
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                backgroundColor: Colors.white,
+                                onPressed: () {
+                                  if (_isListening) _speech.stop();
+                                  Navigator.pop(context);
+                                  _textController.text = "1분 뒤에 아침약 복용 알람 등록해줘";
+                                  _sendMessage();
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
