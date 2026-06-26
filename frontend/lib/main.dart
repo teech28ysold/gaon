@@ -805,12 +805,21 @@ class _ChatScreenState extends State<ChatScreen> {
             onTap: _showScheduleHelpDialog,
           ),
           _buildPurposeButton(
+            icon: Icons.local_taxi_rounded,
+            title: "택시 도움",
+            subtitle: "자녀나 보호자에게 택시 호출 도움을 요청합니다.",
+            color: const Color(0xFF2563EB),
+            bgColor: const Color(0xFFEFF6FF),
+            animationIndex: 3,
+            onTap: _showTaxiHelpDialog,
+          ),
+          _buildPurposeButton(
             icon: Icons.family_restroom_rounded,
             title: "자녀 안심 알림",
             subtitle: "보호자에게 안부 문자를 보냅니다.",
             color: GaonColors.brightTeal,
             bgColor: const Color(0xFFE9FFFB),
-            animationIndex: 3,
+            animationIndex: 4,
             onTap: _sendGuardianSafetyAlert,
           ),
           _buildPurposeButton(
@@ -819,7 +828,7 @@ class _ChatScreenState extends State<ChatScreen> {
             subtitle: "안내문, 처방전, 약봉투를 사진으로 읽습니다.",
             color: const Color(0xFFD97706),
             bgColor: const Color(0xFFFFF3D6),
-            animationIndex: 4,
+            animationIndex: 5,
             onTap: _pickAndSendImage,
           ),
           _buildPurposeButton(
@@ -828,7 +837,7 @@ class _ChatScreenState extends State<ChatScreen> {
             subtitle: "유튜브 링크가 믿을 만한지 확인합니다.",
             color: const Color(0xFFB42318),
             bgColor: const Color(0xFFFFF1F2),
-            animationIndex: 5,
+            animationIndex: 6,
             onTap: _showYoutubeCheckDialog,
           ),
         ],
@@ -1241,6 +1250,428 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showTaxiHelpDialog() {
+    final customDestinationController = TextEditingController();
+
+    void closeAndConfirm(String destination) {
+      final trimmed = destination.trim();
+      if (trimmed.isEmpty) {
+        _showErrorSnackBar("목적지를 입력해 주세요.");
+        return;
+      }
+      Navigator.pop(context);
+      _confirmTaxiHelpRequest(trimmed);
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.9,
+          child: SafeArea(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              padding: EdgeInsets.only(
+                left: 18,
+                right: 18,
+                top: 18,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 18,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEFF6FF),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.local_taxi_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          "택시 도움",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E272E),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: "닫기",
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded, size: 30),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "가온이 보호자에게 목적지와 현재 위치를 문자로 보내 도움을 요청합니다.",
+                    style: TextStyle(
+                      fontSize: 18,
+                      height: 1.35,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        _buildTaxiDestinationButton(
+                          icon: Icons.home_rounded,
+                          title: "집으로 가기",
+                          subtitle: "보호자에게 집으로 가는 택시 도움을 요청합니다.",
+                          onTap: () => closeAndConfirm("집"),
+                        ),
+                        _buildTaxiDestinationButton(
+                          icon: Icons.local_hospital_rounded,
+                          title: "병원 가기",
+                          subtitle: "병원 방문을 위한 택시 도움을 요청합니다.",
+                          onTap: () => closeAndConfirm("병원"),
+                        ),
+                        _buildTaxiDestinationButton(
+                          icon: Icons.groups_rounded,
+                          title: "복지센터 가기",
+                          subtitle: "복지센터 이동을 위한 택시 도움을 요청합니다.",
+                          onTap: () => closeAndConfirm("복지센터"),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: customDestinationController,
+                          minLines: 2,
+                          maxLines: 3,
+                          style: const TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: "직접 목적지 입력",
+                            hintText: "예: ○○병원, 집, 시장",
+                            labelStyle: const TextStyle(fontSize: 18),
+                            hintStyle: const TextStyle(fontSize: 18),
+                            filled: true,
+                            fillColor: const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 58,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () => closeAndConfirm(
+                              customDestinationController.text,
+                            ),
+                            icon: const Icon(Icons.send_rounded, size: 26),
+                            label: const Text(
+                              "이 목적지로 도움 요청",
+                              style: TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ).whenComplete(customDestinationController.dispose);
+  }
+
+  Widget _buildTaxiDestinationButton({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEFF6FF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: const Color(0xFF2563EB), size: 30),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E272E),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.25,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF64748B),
+                  size: 32,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmTaxiHelpRequest(String destination) {
+    if (_guardianNumbers.isEmpty) {
+      _showGuardianRequiredDialog();
+      return;
+    }
+
+    final targetNames = _guardianNumbers.join(', ');
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(
+                Icons.local_taxi_rounded,
+                color: Color(0xFF2563EB),
+                size: 30,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "택시 도움 요청",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            "보호자 연락처 ($targetNames)로 택시 도움 문자를 보낼까요?\n\n목적지: $destination",
+            style: const TextStyle(fontSize: 18, height: 1.45),
+          ),
+          actionsOverflowDirection: VerticalDirection.down,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "취소",
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                _sendTaxiHelpRequest(destination);
+              },
+              icon: const Icon(Icons.send_rounded),
+              label: const Text("요청하기", style: TextStyle(fontSize: 18)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showGuardianRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.redAccent,
+                size: 28,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "보호자 등록 필요",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            "택시 도움 요청을 보내려면 먼저 보호자 번호를 등록해 주세요.",
+            style: TextStyle(fontSize: 18, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "닫기",
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0F5A5C),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                _showGuardianRegisterDialog();
+              },
+              child: const Text("등록하기", style: TextStyle(fontSize: 18)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _sendTaxiHelpRequest(String destination) async {
+    if (_guardianNumbers.isEmpty) {
+      _showGuardianRequiredDialog();
+      return;
+    }
+
+    final targetNames = _guardianNumbers.join(', ');
+    final position = await _getCurrentLocation();
+    final locationText = position == null
+        ? "현재 위치: 위치 확인이 되지 않았습니다. 전화로 위치를 확인해 주세요."
+        : "현재 위치: https://maps.google.com/?q=${position.latitude},${position.longitude}";
+
+    final smsContent =
+        "[가온 택시도움] 부모님께서 택시 호출 도움을 요청하셨습니다.\n"
+        "목적지: $destination\n"
+        "$locationText\n"
+        "전화로 확인 후 택시 호출을 도와주세요.";
+
+    String deliveryTitle = "택시 도움 요청 완료";
+    String deliveryMessage = "보호자 연락처 ($targetNames)로 택시 도움 문자를 요청했습니다.";
+
+    try {
+      final value = await ApiService.sendSms(_guardianNumbers, smsContent);
+      final mode = value['mode'] ?? 'mock';
+      debugPrint("택시 도움 SMS 백엔드 전송 성공: $value");
+      if (mode == 'live') {
+        deliveryTitle = "택시 도움 문자 발송 완료";
+        deliveryMessage =
+            "보호자 연락처 ($targetNames)로 택시 도움 문자를 실제 발송 요청했습니다.\n\n목적지: $destination";
+      } else {
+        deliveryTitle = "택시 도움 문자 테스트 완료";
+        deliveryMessage =
+            "보호자 연락처 ($targetNames)로 보낼 택시 도움 문자가 테스트 모드로 기록되었습니다.\n\n실제 문자 발송은 서버에 문자 API 키와 발신번호를 설정하면 사용할 수 있습니다.";
+      }
+    } catch (err) {
+      debugPrint("택시 도움 SMS 백엔드 전송 에러: $err");
+      deliveryTitle = "문자 발송 확인 필요";
+      deliveryMessage = "택시 도움 요청 중 오류가 발생했습니다.\n\n보호자 연락처와 서버 문자 설정을 확인해 주세요.";
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              const Icon(
+                Icons.local_taxi_rounded,
+                color: Color(0xFF2563EB),
+                size: 30,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  deliveryTitle,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            deliveryMessage,
+            style: const TextStyle(fontSize: 18, height: 1.45),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text("확인", style: TextStyle(fontSize: 18)),
+            ),
+          ],
         );
       },
     );
