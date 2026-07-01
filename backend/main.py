@@ -211,94 +211,7 @@ def extract_schedule_info(user_msg: str, current_time_str: str) -> dict:
         print(f"일정 추출 오류: {e}")
         return {"is_schedule": False}
 
-# 3. 유튜브 관련 헬퍼 함수들
-def extract_youtube_video_id(message: str) -> str:
-    import re
-    patterns = [
-        r"(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&\s\?]+)",
-        r"(?:https?:\/\/)?(?:www\.)?youtu\.be\/([^&\s\?]+)",
-        r"(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([^&\s\?]+)",
-        r"(?:https?:\/\/)?m\.youtube\.com\/watch\?v=([^&\s\?]+)"
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, message, re.IGNORECASE)
-        if match:
-            return match.group(1)
-    return ""
-
-def get_youtube_transcript(video_id: str) -> str:
-    from youtube_transcript_api import YouTubeTranscriptApi
-    try:
-        api = YouTubeTranscriptApi()
-        try:
-            transcript_list = api.fetch(video_id, languages=['ko', 'en'])
-        except Exception:
-            transcript_list_info = api.list(video_id)
-            transcript = None
-            try:
-                transcript = transcript_list_info.find_transcript(['ko', 'en'])
-            except Exception:
-                pass
-            if not transcript:
-                for t in transcript_list_info:
-                    transcript = t
-                    break
-            if not transcript:
-                return ""
-            transcript_list = transcript.fetch()
-        
-        transcript_text = " ".join([item.text for item in transcript_list])
-        return transcript_text
-    except Exception as e:
-        print(f"자막 추출 에러: {e}")
-        return ""
-
-def fact_check_youtube_transcript(transcript: str) -> dict:
-    if not client:
-        return {"category": "기타", "status": "safe", "summary": "Gemini API 비활성화 상태입니다.", "details": "서버 설정을 확인해 주세요."}
-    try:
-        if len(transcript) > 15000:
-            transcript = transcript[:15000] + " (이하 생략)"
-            
-        prompt = (
-            f"다음 유튜브 영상의 자막 내용을 꼼꼼하게 분석하여 팩트 체크 및 분석을 수행하세요.\n\n"
-            f"[자막 내용]\n"
-            f"{transcript}\n\n"
-            f"1. 이 영상이 담고 있는 주요 정보의 주제(카테고리)를 다음 중 하나로 분류하세요: [건강, 금융, 기타]\n"
-            f"2. 이 영상의 정보가 과대광고, 근거 없는 허위 정보, 낚시성 정보, 사기성 정보 등 위험 요소를 담고 있는지 분석하세요.\n"
-            f"3. 분석 결과에 따라 상태(status)를 'warning'(위험/경고) 또는 'safe'(유용/안전) 중 하나로 판정하세요.\n"
-            f"4. 40~50대 시니어가 이해하기 쉽고 명확하게 설명해 주세요.\n"
-            f"   - 유용하거나 안전한 영상인 경우, 영상 내용의 핵심 요점 3줄 요약(summary)을 제공하세요.\n"
-            f"   - 위험하거나 과대광고인 경우, 왜 위험한지 그 요점(경고 정보)을 3줄 요약(summary)으로 제공하세요.\n"
-            f"5. 구체적인 분석 및 설명은 세부내용(details)에 작성하세요.\n\n"
-            f"반드시 다음 JSON 스키마 형식으로만 답변을 작성하고 다른 설명은 하지 마세요:\n"
-            f"{{\n"
-            f"  \"category\": \"건강/금융/기타 중 하나\",\n"
-            f"  \"status\": \"warning/safe 중 하나\",\n"
-            f"  \"summary\": \"3줄 요약 및 경고 요점 (예: 1. ...\\n2. ...\\n3. ...)\",\n"
-            f"  \"details\": \"구체적인 팩트 체크 근거 및 세부 분석 설명\"\n"
-            f"}}"
-        )
-        response = client.models.generate_content(
-            model="gemini-2.5-pro",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
-        )
-        import json
-        result = json.loads(response.text.strip())
-        return result
-    except Exception as e:
-        print(f"팩트 체크 분석 에러: {e}")
-        return {
-            "category": "기타",
-            "status": "warning",
-            "summary": "팩트 체크 분석 중 기술적인 오류가 발생했습니다.",
-            "details": f"오류 원인: {str(e)}"
-        }
-
-# 4. 메시지 전송 및 가온 AI 응답 생성 API
+# 3. 메시지 전송 및 가온 AI 응답 생성 API
 @app.post("/api/chat")
 def post_chat_message(request: ChatRequest):
     user_msg = request.message.strip()
@@ -324,123 +237,106 @@ def post_chat_message(request: ChatRequest):
         weekday_kr = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"][now.weekday()]
         current_time_str = now.strftime(f"%Y-%m-%d %H:%M:%S ({weekday_kr})")
         
-        # 3) 유튜브 링크 여부 및 분석 수행
-        youtube_video_id = extract_youtube_video_id(user_msg)
-        is_youtube = youtube_video_id != ""
+        # 3) 일정 및 대화 분석 진행
         msg_type = "text"
         ai_reply = ""
-        
-        if is_youtube:
-            # 유튜브 자막 로드
-            transcript = get_youtube_transcript(youtube_video_id)
-            if not transcript:
-                # 자막이 없는 폴백 케이스
-                ai_reply = "자막이 없는 영상이라 분석이 어렵습니다. 😢\n다른 자막이 있는 유익한 건강/금융 영상을 공유해 주시면 꼼꼼하게 검증해 드릴게요! 😊"
-                msg_type = "text"
-            else:
-                # 자막 팩트 체크 분석 수행
-                fact_check_result = fact_check_youtube_transcript(transcript)
-                import json
-                ai_reply = json.dumps(fact_check_result, ensure_ascii=False)
-                msg_type = "fact_check"
-        else:
-            # 4) 일반 메시지의 경우 일정 및 대화 분석 진행
-            if client:
-                schedule_info = extract_schedule_info(user_msg, current_time_str)
-                if schedule_info.get("is_schedule"):
-                    try:
-                        cursor.execute(
-                            "INSERT INTO Schedules (task_content, task_time, is_done) VALUES (?, ?, ?)",
-                            (schedule_info["task_content"], schedule_info["task_time"], 0)
-                        )
-                        schedule_id = cursor.lastrowid
-                        schedule_data = {
-                            "id": schedule_id,
-                            "task_content": schedule_info["task_content"],
-                            "task_time": schedule_info["task_time"]
-                        }
-                    except Exception as db_err:
-                        print(f"일정 DB 저장 오류: {db_err}")
 
-            # 5) Gemini 2.5 Pro를 사용한 시니어 맞춤 답변 생성
-            if client:
+        if client:
+            schedule_info = extract_schedule_info(user_msg, current_time_str)
+            if schedule_info.get("is_schedule"):
                 try:
-                    # 오늘 등록된 일정 목록 조회해서 Gemini에 참고 정보로 전달
-                    today_str = now.strftime("%Y-%m-%d")
-                    cursor.execute("SELECT task_content, task_time, is_done FROM Schedules WHERE task_time LIKE ?", (f"{today_str}%",))
-                    today_schedules = cursor.fetchall()
-                    schedules_summary = []
-                    for s in today_schedules:
-                        status_str = "완료" if s["is_done"] == 1 else "예약됨(미완료)"
-                        schedules_summary.append(f"- {s['task_content']} ({s['task_time'][11:16]}, 상태: {status_str})")
-                    schedules_text = "\n".join(schedules_summary) if schedules_summary else "오늘 등록된 일정이 없습니다."
-
-                    system_time_str = now.strftime(f"%Y년 %m월 %d일 {weekday_kr} %H시 %M분")
-                    system_instruction = (
-                        "당신은 40~50대 시니어를 위한 다정하고 꼼꼼한 AI 비서 '가온'입니다.\n"
-                        f"현재 기준 일시는 {system_time_str} 입니다. 오늘 날짜, 시간, 요일 등에 대한 질문에는 반드시 이 정보를 기준으로 정확하게 대답해 주세요.\n"
-                        f"\n[오늘 부모님의 일정/약 복용 기록]\n{schedules_text}\n"
-                        "아버님, 어머님과 대화하듯이 항상 따뜻하고 친근하며 다정한 말투로 답변해 주세요.\n"
-                        "설명은 너무 장황하지 않게 핵심만 짚어서 2~3줄로 이해하기 쉽게 설명해 주세요.\n"
-                        "답변 중간에 어울리는 이모티콘(😊, 🌸, 📝 등)을 적절히 섞어주세요.\n"
-                        "정치적인 질문이나 경제 정보(예: 현재 대한민국 대통령 이름, 실시간 주식 가격, 뉴스 등)에 대해서는 절대 답변을 회피하거나 거절하지 말고, 반드시 구글 검색 도구(Google Search)를 연동하여 확인한 정확한 검색 결과를 바탕으로 팩트에 맞게 사실대로 친절하게 답변하세요."
-                    )
-                    
-                    # 위치 정보(GPS) 제공 시 지침 가이드라인 추가
-                    if latitude is not None and longitude is not None:
-                        system_instruction += (
-                            f"\n\n[사용자 현재 위치 정보]\n"
-                            f"- 위도(Latitude): {latitude}\n"
-                            f"- 경도(Longitude): {longitude}\n"
-                            f"사용자가 위치 기반 질문(예: '주변 병원 알려줘', '근처 약국 추천해줘' 등)을 한 경우, 위 위도와 경도 좌표를 기반으로 구글 검색을 통해 사용자 주변에 실제로 존재하는 병원, 의원, 약국 등의 시설 정보를 이름, 거리/위치와 함께 친절하고 정확하게 찾아서 가르쳐 주세요."
-                        )
-                    
-                    # 일정 등록 시 지침 가이드라인 추가
-                    if schedule_data:
-                        system_instruction += (
-                            f"\n\n[알림 설정 정보]\n"
-                            f"- 할 일: {schedule_data['task_content']}\n"
-                            f"- 예약 시간: {schedule_data['task_time']}\n"
-                            f"방금 이 할 일과 예약 시간에 알람(알림)이 등록되었습니다. 사용자에게 다정하고 명확하게 알람 등록이 완료되었음을 알려주세요."
-                        )
-                    
-                    # 이전 대화 내역 조회 (가장 최근 10개)
                     cursor.execute(
-                        "SELECT sender, message FROM ChatHistory WHERE id < ? AND msg_type = 'text' ORDER BY id DESC LIMIT 10",
-                        (user_msg_id,)
+                        "INSERT INTO Schedules (task_content, task_time, is_done) VALUES (?, ?, ?)",
+                        (schedule_info["task_content"], schedule_info["task_time"], 0)
                     )
-                    recent_history = cursor.fetchall()
-                    recent_history.reverse()
-                    
-                    contents = []
-                    for row in recent_history:
-                        role = "user" if row["sender"] == "user" else "model"
-                        contents.append(
-                            types.Content(
-                                role=role,
-                                parts=[types.Part.from_text(text=row["message"])]
-                            )
-                        )
-                    # 현재 사용자 메시지 추가
+                    schedule_id = cursor.lastrowid
+                    schedule_data = {
+                        "id": schedule_id,
+                        "task_content": schedule_info["task_content"],
+                        "task_time": schedule_info["task_time"]
+                    }
+                except Exception as db_err:
+                    print(f"일정 DB 저장 오류: {db_err}")
+
+        # 4) Gemini 2.5 Pro를 사용한 시니어 맞춤 답변 생성
+        if client:
+            try:
+                # 오늘 등록된 일정 목록 조회해서 Gemini에 참고 정보로 전달
+                today_str = now.strftime("%Y-%m-%d")
+                cursor.execute("SELECT task_content, task_time, is_done FROM Schedules WHERE task_time LIKE ?", (f"{today_str}%",))
+                today_schedules = cursor.fetchall()
+                schedules_summary = []
+                for s in today_schedules:
+                    status_str = "완료" if s["is_done"] == 1 else "예약됨(미완료)"
+                    schedules_summary.append(f"- {s['task_content']} ({s['task_time'][11:16]}, 상태: {status_str})")
+                schedules_text = "\n".join(schedules_summary) if schedules_summary else "오늘 등록된 일정이 없습니다."
+
+                system_time_str = now.strftime(f"%Y년 %m월 %d일 {weekday_kr} %H시 %M분")
+                system_instruction = (
+                    "당신은 40~50대 시니어를 위한 다정하고 꼼꼼한 AI 비서 '가온'입니다.\n"
+                    f"현재 기준 일시는 {system_time_str} 입니다. 오늘 날짜, 시간, 요일 등에 대한 질문에는 반드시 이 정보를 기준으로 정확하게 대답해 주세요.\n"
+                    f"\n[오늘 부모님의 일정/약 복용 기록]\n{schedules_text}\n"
+                    "아버님, 어머님과 대화하듯이 항상 따뜻하고 친근하며 다정한 말투로 답변해 주세요.\n"
+                    "설명은 너무 장황하지 않게 핵심만 짚어서 2~3줄로 이해하기 쉽게 설명해 주세요.\n"
+                    "답변 중간에 어울리는 이모티콘(😊, 🌸, 📝 등)을 적절히 섞어주세요.\n"
+                    "정치적인 질문이나 경제 정보(예: 현재 대한민국 대통령 이름, 실시간 주식 가격, 뉴스 등)에 대해서는 절대 답변을 회피하거나 거절하지 말고, 반드시 구글 검색 도구(Google Search)를 연동하여 확인한 정확한 검색 결과를 바탕으로 팩트에 맞게 사실대로 친절하게 답변하세요."
+                )
+                
+                # 위치 정보(GPS) 제공 시 지침 가이드라인 추가
+                if latitude is not None and longitude is not None:
+                    system_instruction += (
+                        f"\n\n[사용자 현재 위치 정보]\n"
+                        f"- 위도(Latitude): {latitude}\n"
+                        f"- 경도(Longitude): {longitude}\n"
+                        f"사용자가 위치 기반 질문(예: '주변 병원 알려줘', '근처 약국 추천해줘' 등)을 한 경우, 위 위도와 경도 좌표를 기반으로 구글 검색을 통해 사용자 주변에 실제로 존재하는 병원, 의원, 약국 등의 시설 정보를 이름, 거리/위치와 함께 친절하고 정확하게 찾아서 가르쳐 주세요."
+                    )
+                
+                # 일정 등록 시 지침 가이드라인 추가
+                if schedule_data:
+                    system_instruction += (
+                        f"\n\n[알림 설정 정보]\n"
+                        f"- 할 일: {schedule_data['task_content']}\n"
+                        f"- 예약 시간: {schedule_data['task_time']}\n"
+                        f"방금 이 할 일과 예약 시간에 알람(알림)이 등록되었습니다. 사용자에게 다정하고 명확하게 알람 등록이 완료되었음을 알려주세요."
+                    )
+                
+                # 이전 대화 내역 조회 (가장 최근 10개)
+                cursor.execute(
+                    "SELECT sender, message FROM ChatHistory WHERE id < ? AND msg_type = 'text' ORDER BY id DESC LIMIT 10",
+                    (user_msg_id,)
+                )
+                recent_history = cursor.fetchall()
+                recent_history.reverse()
+                
+                contents = []
+                for row in recent_history:
+                    role = "user" if row["sender"] == "user" else "model"
                     contents.append(
                         types.Content(
-                            role="user",
-                            parts=[types.Part.from_text(text=user_msg)]
+                            role=role,
+                            parts=[types.Part.from_text(text=row["message"])]
                         )
                     )
+                # 현재 사용자 메시지 추가
+                contents.append(
+                    types.Content(
+                        role="user",
+                        parts=[types.Part.from_text(text=user_msg)]
+                    )
+                )
 
-                    config = types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        tools=[types.Tool(google_search=types.GoogleSearch())]
-                    )
-                    response = client.models.generate_content(
-                        model="gemini-2.5-pro",
-                        contents=contents,
-                        config=config
-                    )
-                    ai_reply = response.text.strip()
-                except Exception as e:
-                    ai_reply = f"아버님 어머님, 말씀하신 '{user_msg}' 내용을 잘 받아적어 두었어요! 😊 지금 서버 통신이 원활하지 않아 간략하게만 보관할게요. 궁금한 점이 있으시면 잠시 후 편하게 다시 여쭤봐 주세요! (오류: {str(e)})"
+                config = types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=[types.Tool(google_search=types.GoogleSearch())]
+                )
+                response = client.models.generate_content(
+                    model="gemini-2.5-pro",
+                    contents=contents,
+                    config=config
+                )
+                ai_reply = response.text.strip()
+            except Exception as e:
+                ai_reply = f"아버님 어머님, 말씀하신 '{user_msg}' 내용을 잘 받아적어 두었어요! 😊 지금 서버 통신이 원활하지 않아 간략하게만 보관할게요. 궁금한 점이 있으시면 잠시 후 편하게 다시 여쭤봐 주세요! (오류: {str(e)})"
             else:
                 ai_reply = f"아버님 어머님, '{user_msg}'라고 말씀하셨군요! 😊 제가 잘 기억해 두었다가 다음에도 꼼꼼히 챙겨드릴게요. 더 필요하신 심부름이나 궁금한 점이 있으시면 편하게 말씀해 주세요!"
         

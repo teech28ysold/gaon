@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -12,7 +11,6 @@ import 'widgets/gaon_chat_bubble.dart';
 import 'widgets/gaon_primary_button.dart';
 import 'widgets/gaon_theme.dart';
 import 'widgets/senior_category_card.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,7 +55,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
-  bool _isAnalyzingYoutube = false;
   bool _isHomeMode = true;
   List<String> _guardianNumbers = [];
   String? _currentlySpeakingText;
@@ -272,15 +269,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // 유튜브 링크 감지 헬퍼
-  bool _isYoutubeUrl(String text) {
-    final RegExp regExp = RegExp(
-      r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/|m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]+)',
-      caseSensitive: false,
-    );
-    return regExp.hasMatch(text);
-  }
-
   // GPS 좌표 실시간 획득 헬퍼
   Future<Position?> _getCurrentLocation() async {
     try {
@@ -325,15 +313,10 @@ class _ChatScreenState extends State<ChatScreen> {
       'msg_type': 'text',
     };
 
-    final isYoutube = _isYoutubeUrl(text);
-
     setState(() {
       _messages.add(tempUserMessage);
       _isSending = true;
       _isHomeMode = false;
-      if (isYoutube) {
-        _isAnalyzingYoutube = true;
-      }
     });
     _scrollToBottom();
 
@@ -368,7 +351,6 @@ class _ChatScreenState extends State<ChatScreen> {
           // AI 응답 추가
           _messages.add(response['ai_message']);
           _isSending = false;
-          _isAnalyzingYoutube = false;
         });
         _scrollToBottom();
 
@@ -380,7 +362,6 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       setState(() {
         _isSending = false;
-        _isAnalyzingYoutube = false;
         // 실패 시 임시 메시지 삭제
         _messages.remove(tempUserMessage);
       });
@@ -657,15 +638,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
         final msg = _messages[index];
         final isUser = msg['sender'] == 'user';
-        final msgType = msg['msg_type'] ?? 'text';
-
-        if (!isUser && msgType == 'fact_check') {
-          return _buildFactCheckCard(
-            messageJson: msg['message'] ?? '',
-            timestamp: msg['timestamp'] ?? '',
-          );
-        }
-
         return _buildChatBubble(
           message: msg['message'] ?? '',
           isUser: isUser,
@@ -814,31 +786,13 @@ class _ChatScreenState extends State<ChatScreen> {
             onTap: _showTaxiHelpDialog,
           ),
           _buildPurposeButton(
-            icon: Icons.family_restroom_rounded,
-            title: "자녀 안심 알림",
-            subtitle: "보호자에게 안부 문자를 보냅니다.",
-            color: GaonColors.brightTeal,
-            bgColor: const Color(0xFFE9FFFB),
-            animationIndex: 4,
-            onTap: _sendGuardianSafetyAlert,
-          ),
-          _buildPurposeButton(
             icon: Icons.document_scanner_rounded,
             title: "문서 읽기",
             subtitle: "안내문, 처방전, 약봉투를 사진으로 읽습니다.",
             color: const Color(0xFFD97706),
             bgColor: const Color(0xFFFFF3D6),
-            animationIndex: 5,
+            animationIndex: 4,
             onTap: _pickAndSendImage,
-          ),
-          _buildPurposeButton(
-            icon: Icons.ondemand_video_rounded,
-            title: "영상 확인",
-            subtitle: "유튜브 링크가 믿을 만한지 확인합니다.",
-            color: const Color(0xFFB42318),
-            bgColor: const Color(0xFFFFF1F2),
-            animationIndex: 6,
-            onTap: _showYoutubeCheckDialog,
           ),
         ],
       ),
@@ -891,54 +845,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  void _showYoutubeCheckDialog() {
-    final urlController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            "영상 확인",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          content: TextField(
-            controller: urlController,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            decoration: const InputDecoration(
-              labelText: "유튜브 링크",
-              hintText: "https://youtu.be/...",
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("취소", style: TextStyle(fontSize: 18)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE11D48),
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                final url = urlController.text.trim();
-                if (url.isEmpty) return;
-                Navigator.pop(context);
-                _sendMessage(
-                  customText: "이 유튜브 영상이 어르신이 믿고 봐도 되는 영상인지 확인해줘: $url",
-                );
-              },
-              child: const Text("확인하기", style: TextStyle(fontSize: 18)),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -1108,50 +1014,6 @@ class _ChatScreenState extends State<ChatScreen> {
               );
             },
           ),
-          const SizedBox(height: 12),
-
-          // 자녀 안심 알림 퀵 카드
-          GaonCard(
-                onTap: () => _sendGuardianSafetyAlert(),
-                backgroundColor: const Color(0xFFE9FFFB),
-                borderColor: GaonColors.brightTeal.withAlpha(55),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.mail_outline_rounded,
-                      size: 38,
-                      color: GaonColors.brightTeal,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "✉️ 자녀에게 안심 안부 보내기",
-                            style: GaonTextStyles.title.copyWith(
-                              color: GaonColors.deepTeal,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            "부모님이 잘 계신다는 문자를 자녀분께 보내드립니다.",
-                            style: GaonTextStyles.body.copyWith(fontSize: 18),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 22,
-                      color: GaonColors.brightTeal,
-                    ),
-                  ],
-                ),
-              )
-              .animate(delay: 260.ms)
-              .fadeIn(duration: 260.ms)
-              .slideY(begin: 0.08, end: 0, duration: 260.ms),
         ],
       ),
     );
@@ -1677,121 +1539,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // 자녀 안심 안부 알림 전송 모의 처리
-  void _sendGuardianSafetyAlert() {
-    if (_guardianNumbers.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Row(
-              children: const [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.redAccent,
-                  size: 28,
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    "보호자 등록 필요",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            content: const Text(
-              "등록된 보호자(자녀) 번호가 없습니다.\n먼저 자녀분의 번호를 등록해 주세요.",
-              style: TextStyle(fontSize: 17, height: 1.4),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  "닫기",
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
-                ),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F5A5C),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showGuardianRegisterDialog();
-                },
-                child: const Text("등록하기", style: TextStyle(fontSize: 18)),
-              ),
-            ],
-          );
-        },
-      );
-      return;
-    }
-
-    final targetNames = _guardianNumbers.join(', ');
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: const [
-              Icon(
-                Icons.mark_email_read_rounded,
-                color: Color(0xFF16A34A),
-                size: 28,
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  "안심 안부 문자 전송",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            "보호자 연락처 ($targetNames) 로 아래 안심 문자를 전송하시겠습니까?\n\n\"[가온 안심알림] 부모님께서 가온 비서를 사용 중이시며, 현재 건강하게 잘 계신다고 안부를 전하셨습니다. 😊\"",
-            style: const TextStyle(
-              fontSize: 17,
-              height: 1.5,
-              color: Colors.black87,
-            ),
-          ),
-          actionsOverflowDirection: VerticalDirection.down,
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                "취소",
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF16A34A),
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                _showGuardianSmsAlert("부모님 안심 안부 전송");
-              },
-              child: const Text("보내기", style: TextStyle(fontSize: 18)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   // 가온 비서 생각중(대기) 표시
   Widget _buildTypingIndicator() {
     return Padding(
@@ -1856,14 +1603,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       const SizedBox(width: 10),
                       Flexible(
                         child: Text(
-                          _isAnalyzingYoutube
-                              ? "가온이가 유튜브 영상을 꼼꼼하게 팩트 체크하는 중입니다..."
-                              : (_messages.isNotEmpty &&
-                                        _messages.last['message']
-                                            .toString()
-                                            .contains("📷")
-                                    ? "가온이가 사진을 읽고 분석하는 중입니다..."
-                                    : "가온이가 생각하고 있습니다..."),
+                          _messages.isNotEmpty &&
+                                  _messages.last['message'].toString().contains(
+                                    "📷",
+                                  )
+                              ? "가온이가 사진을 읽고 분석하는 중입니다..."
+                              : "가온이가 생각하고 있습니다...",
                           style: const TextStyle(
                             fontSize: 17,
                             color: Colors.black54,
@@ -1880,213 +1625,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
-  }
-
-  // 4단계: 정보 방패 - 유튜브 팩트 체크 커스텀 카드 UI
-  Widget _buildFactCheckCard({
-    required String messageJson,
-    required String timestamp,
-  }) {
-    Map<String, dynamic> data;
-    try {
-      data = json.decode(messageJson);
-    } catch (e) {
-      // JSON 파싱 실패시 폴백으로 일반 메시지 렌더링
-      return _buildChatBubble(
-        message: messageJson,
-        isUser: false,
-        timestamp: timestamp,
-      );
-    }
-
-    final category = data['category'] ?? '기타';
-    final status = data['status'] ?? 'safe'; // warning 또는 safe
-    final summary = data['summary'] ?? '';
-    final details = data['details'] ?? '';
-    final formattedTime = _formatKoreanTime(timestamp);
-
-    final isWarning = status == 'warning';
-
-    // 카드 테마 색상 설정
-    final cardBorderColor = isWarning
-        ? const Color(0xFFE11D48)
-        : GaonColors.brightTeal;
-    final cardBgColor = isWarning
-        ? const Color(0xFFFFF1F2)
-        : GaonColors.warmIvory;
-    final bannerBgColor = isWarning
-        ? const Color(0xFFFFE4E6)
-        : const Color(0xFFD1FAE5);
-    final bannerTextColor = isWarning
-        ? const Color(0xFF9F1239)
-        : const Color(0xFF065F46);
-    final iconColor = isWarning
-        ? const Color(0xFFE11D48)
-        : const Color(0xFF047857);
-    final iconData = isWarning
-        ? Icons.warning_amber_rounded
-        : Icons.verified_user_rounded;
-
-    return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                backgroundColor: GaonColors.deepTeal,
-                radius: 22,
-                child: const Icon(
-                  Icons.support_agent_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "가온 비서 (정보 방패 🛡️)",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Flexible(
-                          child: GaonCard(
-                            padding: EdgeInsets.zero,
-                            backgroundColor: cardBgColor,
-                            borderColor: cardBorderColor,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 1. 상태 배너 및 카테고리 뱃지
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: bannerBgColor,
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(22),
-                                      topRight: Radius.circular(22),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        iconData,
-                                        color: iconColor,
-                                        size: 24,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          isWarning
-                                              ? "⚠️ 경고: 의심스러운 정보!"
-                                              : "✅ 검증 완료: 안전한 정보!",
-                                          style: TextStyle(
-                                            fontSize: 19,
-                                            fontWeight: FontWeight.bold,
-                                            color: bannerTextColor,
-                                          ),
-                                        ),
-                                      ),
-                                      // 카테고리 표시
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isWarning
-                                              ? const Color(0xFFFFC9C9)
-                                              : const Color(0xFFBBF7D0),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          category,
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: bannerTextColor,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                // 2. 요약 내용 영역
-                                Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        "📋 가온이의 3줄 요약 및 분석",
-                                        style: TextStyle(
-                                          fontSize: 19,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF1E272E),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      SelectableText(
-                                        summary,
-                                        style: const TextStyle(
-                                          fontSize: 21,
-                                          color: Color(0xFF2C3E50),
-                                          height: 1.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                // 구분선
-                                Divider(
-                                  color: cardBorderColor.withAlpha(100),
-                                  height: 1,
-                                  thickness: 1,
-                                ),
-                                // 3. 상세내용 펼치기 영역
-                                FactCheckDetailsExpander(
-                                  details: details,
-                                  borderColor: cardBorderColor,
-                                  textColor: const Color(0xFF2C3E50),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          formattedTime,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black38,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        )
-        .animate()
-        .fadeIn(duration: 280.ms)
-        .slideY(begin: 0.06, end: 0, duration: 280.ms);
   }
 
   // 카카오톡 스타일 말풍선 (가독성 극대화 및 깔끔한 대형 텍스트)
@@ -2483,10 +2021,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // 백엔드로 가상 SMS 전송 요청 발송 (비동기 호출)
     String smsContent = "[가온 안심알림] 부모님께서 가온 비서를 사용 중이십니다.";
-    if (alertType.contains("안심 안부 전송")) {
-      smsContent =
-          "[가온 안심알림] 부모님께서 가온 비서를 사용 중이시며, 현재 건강하게 잘 계신다고 안부를 전하셨습니다. 😊";
-    } else if (alertType.contains("사진 분석")) {
+    if (alertType.contains("사진 분석")) {
       smsContent =
           "[가온 안심알림] 부모님께서 약봉투/처방전 사진 분석을 완료하셨습니다. 건강을 잘 챙기고 계십니다. 🛡️";
     } else if (alertType.contains("등록:")) {
@@ -2615,18 +2150,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ); // 시니어가 듣기 편하도록 속도를 약간 천천히 설정 (기본값 0.5가 적당)
       await _flutterTts.setPitch(1.0); // 표준 피치
 
-      // 팩트체크용 JSON 문자열이 들어온 경우 요약문과 세부내용만 발음하도록 필터링
       String speakText = text;
-      if (text.startsWith('{') && text.contains('category')) {
-        try {
-          final data = json.decode(text);
-          final summary = data['summary'] ?? '';
-          final details = data['details'] ?? '';
-          speakText = "가온이의 분석 결과입니다. $summary. 상세 내용은 다음과 같습니다. $details";
-          // 줄바꿈이나 기호 제거하여 읽기 좋게 정제
-          speakText = speakText.replaceAll('\n', ' ');
-        } catch (_) {}
-      }
 
       setState(() {
         _currentlySpeakingText = text;
@@ -2714,84 +2238,66 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       color: GaonColors.warmIvory,
-      child: Row(
-        children: [
-          Expanded(
-            child: GaonPrimaryButton(
-              icon: Icons.stars_rounded,
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                  ),
-                  builder: (context) => SafeArea(
-                    child: FractionallySizedBox(
-                      heightFactor: 0.74,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            const Text(
-                              "🌟 가온 추천 질문 테마",
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E272E),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Expanded(
-                              child: ListView.builder(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                itemCount: _shortcutCategories.length,
-                                itemBuilder: (context, index) {
-                                  final cat = _shortcutCategories[index];
-                                  return SeniorCategoryCard(
-                                    icon: cat['icon'],
-                                    title: cat['title'],
-                                    color: cat['color'],
-                                    backgroundColor: cat['bgColor'],
-                                    animationIndex: index,
-                                    onTap: () {
-                                      Navigator.pop(context);
-                                      _showShortcutQuestions(cat);
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
+      child: GaonPrimaryButton(
+        icon: Icons.stars_rounded,
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            builder: (context) => SafeArea(
+              child: FractionallySizedBox(
+                heightFactor: 0.74,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      const Text(
+                        "🌟 가온 추천 질문 테마",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E272E),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          itemCount: _shortcutCategories.length,
+                          itemBuilder: (context, index) {
+                            final cat = _shortcutCategories[index];
+                            return SeniorCategoryCard(
+                              icon: cat['icon'],
+                              title: cat['title'],
+                              color: cat['color'],
+                              backgroundColor: cat['bgColor'],
+                              animationIndex: index,
+                              onTap: () {
+                                Navigator.pop(context);
+                                _showShortcutQuestions(cat);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
-              label: const FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text("가온 추천 질문 🌟"),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: GaonPrimaryButton(
-              backgroundColor: GaonColors.brightTeal,
-              icon: Icons.mail_rounded,
-              onPressed: _sendGuardianSafetyAlert,
-              label: const FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text("자녀 안심 문자 ✉️"),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
+        label: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text("가온 추천 질문 🌟"),
+        ),
       ),
     );
   }
@@ -3171,82 +2677,5 @@ class _ChatScreenState extends State<ChatScreen> {
         _speech.stop();
       }
     });
-  }
-}
-
-// 4단계: 정보 방패 - 상세 분석 내용을 접고 펼칠 수 있는 인터랙티브 위젯
-class FactCheckDetailsExpander extends StatefulWidget {
-  final String details;
-  final Color borderColor;
-  final Color textColor;
-
-  const FactCheckDetailsExpander({
-    super.key,
-    required this.details,
-    required this.borderColor,
-    required this.textColor,
-  });
-
-  @override
-  State<FactCheckDetailsExpander> createState() =>
-      _FactCheckDetailsExpanderState();
-}
-
-class _FactCheckDetailsExpanderState extends State<FactCheckDetailsExpander> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () {
-            setState(() {
-              _isExpanded = !_isExpanded;
-            });
-          },
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(14),
-            bottomRight: Radius.circular(14),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _isExpanded ? "상세 분석 내용 접기 🔼" : "상세 분석 내용 전체 보기 🔽",
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: widget.borderColor,
-                  ),
-                ),
-                Icon(
-                  _isExpanded
-                      ? Icons.keyboard_arrow_up_rounded
-                      : Icons.keyboard_arrow_down_rounded,
-                  color: widget.borderColor,
-                  size: 24,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_isExpanded)
-          Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-            child: SelectableText(
-              widget.details,
-              style: TextStyle(
-                fontSize: 18,
-                color: widget.textColor,
-                height: 1.5,
-              ),
-            ),
-          ),
-      ],
-    );
   }
 }
