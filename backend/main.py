@@ -337,8 +337,8 @@ def post_chat_message(request: ChatRequest):
                 ai_reply = response.text.strip()
             except Exception as e:
                 ai_reply = f"아버님 어머님, 말씀하신 '{user_msg}' 내용을 잘 받아적어 두었어요! 😊 지금 서버 통신이 원활하지 않아 간략하게만 보관할게요. 궁금한 점이 있으시면 잠시 후 편하게 다시 여쭤봐 주세요! (오류: {str(e)})"
-            else:
-                ai_reply = f"아버님 어머님, '{user_msg}'라고 말씀하셨군요! 😊 제가 잘 기억해 두었다가 다음에도 꼼꼼히 챙겨드릴게요. 더 필요하신 심부름이나 궁금한 점이 있으시면 편하게 말씀해 주세요!"
+        else:
+            ai_reply = f"아버님 어머님, '{user_msg}'라고 말씀하셨군요! 😊 제가 잘 기억해 두었다가 다음에도 꼼꼼히 챙겨드릴게요. 더 필요하신 심부름이나 궁금한 점이 있으시면 편하게 말씀해 주세요!"
         
         # 6) AI 답변 DB 저장 (msg_type 추가)
         cursor.execute(
