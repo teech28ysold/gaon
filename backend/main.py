@@ -152,6 +152,16 @@ def send_solapi_sms(receivers: list[str], message: str) -> dict:
 def read_root():
     return {"message": "가온 AI 비서 백엔드 서버가 작동 중입니다."}
 
+@app.get("/api/status")
+def get_api_status():
+    return {
+        "status": "ok",
+        "gemini_key_present": bool(GEMINI_API_KEY),
+        "gemini_client_configured": client is not None,
+        "render_git_commit": os.getenv("RENDER_GIT_COMMIT", ""),
+        "service": os.getenv("RENDER_SERVICE_NAME", ""),
+    }
+
 # 1. 대화 내역 전체 조회 API
 @app.get("/api/history")
 def get_chat_history():
