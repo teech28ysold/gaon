@@ -2235,7 +2235,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         height: 1.35,
                       ),
                       decoration: const InputDecoration(
-                        hintText: "질문을 크게 입력해 주세요",
+                        hintText: "질문을 입력해 주세요",
                         hintStyle: TextStyle(
                           fontSize: 19,
                           color: Colors.black45,
