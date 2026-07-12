@@ -1,146 +1,177 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
-class ApiService {
-  // FastAPI 서버 주소
-  static String get baseUrl {
-    return 'https://gaon-l0t5.onrender.com';
-  }
+class ApiException implements Exception {
+  final String message;
 
+  const ApiException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+class ApiService {
+  static const String baseUrl = 'https://gaon-l0t5.onrender.com';
   static const Duration _shortTimeout = Duration(seconds: 15);
   static const Duration _longTimeout = Duration(seconds: 60);
+  static const Map<String, String> _jsonHeaders = {
+    'Content-Type': 'application/json',
+  };
 
-  // 1. 대화 내역 가져오기
   static Future<List<Map<String, dynamic>>> getHistory() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/api/history'))
-          .timeout(_shortTimeout);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
-        return data.map((item) => Map<String, dynamic>.from(item)).toList();
-      } else {
-        throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('서버 연결 실패 (주소: $baseUrl). 백엔드가 실행 중인지 확인하세요. 상세: $e');
+    final data = await _requestJson(
+      http.get(Uri.parse('$baseUrl/api/history')),
+      timeout: _shortTimeout,
+    );
+    if (data is! List) {
+      throw const ApiException('대화 내용을 불러오지 못했어요. 다시 시도해 주세요.');
     }
+    return data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
   }
 
-  // 2. 메시지 전송 및 가온 AI 응답 획득
   static Future<Map<String, dynamic>> sendChatMessage(
     String message, {
     double? latitude,
     double? longitude,
   }) async {
-    try {
-      final bodyMap = {
-        'message': message,
-        'latitude': ?latitude,
-        'longitude': ?longitude,
-      };
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/api/chat'),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode(bodyMap),
-          )
-          .timeout(_longTimeout);
-
-      if (response.statusCode == 200) {
-        return Map<String, dynamic>.from(
-          json.decode(utf8.decode(response.bodyBytes)),
-        );
-      } else {
-        throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('서버 연결 실패 (주소: $baseUrl). 백엔드가 실행 중인지 확인하세요. 상세: $e');
-    }
+    return _requestJsonMap(
+      http.post(
+        Uri.parse('$baseUrl/api/chat'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          'message': message,
+          'latitude': ?latitude,
+          'longitude': ?longitude,
+        }),
+      ),
+      timeout: _longTimeout,
+      fallbackMessage: '답변을 가져오지 못했어요. 잠시 후 다시 질문해 주세요.',
+    );
   }
 
-  // 3. 대화 내역 전체 초기화
   static Future<void> clearHistory() async {
-    try {
-      final response = await http
-          .post(Uri.parse('$baseUrl/api/chat/clear'))
-          .timeout(_shortTimeout);
-      if (response.statusCode != 200) {
-        throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('서버 연결 실패 (주소: $baseUrl). 백엔드가 실행 중인지 확인하세요. 상세: $e');
-    }
+    await _requestJson(
+      http.post(Uri.parse('$baseUrl/api/chat/clear')),
+      timeout: _shortTimeout,
+    );
   }
 
-  // 4. 이미지 전송 및 가온 AI 분석 응답 획득
   static Future<Map<String, dynamic>> sendChatImage(
     List<int> bytes,
     String filename,
   ) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/chat/image');
-      final request = http.MultipartRequest('POST', uri);
-
-      final ext = filename.split('.').last.toLowerCase();
-      var mimeType = 'image/jpeg';
-      if (ext == 'png') {
-        mimeType = 'image/png';
-      } else if (ext == 'webp') {
-        mimeType = 'image/webp';
-      } else if (ext == 'gif') {
-        mimeType = 'image/gif';
-      }
-
-      // Multipart 파일 추가
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/chat/image'),
+      );
       request.files.add(
         http.MultipartFile.fromBytes(
           'file',
           bytes,
           filename: filename,
-          contentType: MediaType.parse(mimeType),
+          contentType: MediaType.parse(_mimeTypeFor(filename)),
         ),
       );
-
-      final streamedResponse = await request.send().timeout(_longTimeout);
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 200) {
-        return Map<String, dynamic>.from(
-          json.decode(utf8.decode(response.bodyBytes)),
-        );
-      } else {
-        throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('이미지 업로드 및 분석 실패 (주소: $baseUrl). 상세: $e');
+      final streamed = await request.send().timeout(_longTimeout);
+      final response = await http.Response.fromStream(streamed);
+      return _decodeMapResponse(response, '사진을 읽지 못했어요. 다시 찍어서 보내 주세요.');
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw const ApiException('사진을 보내지 못했어요. 인터넷 연결을 확인해 주세요.');
     }
   }
 
-  // 5. 가상 안심 문자 발송 요청
   static Future<Map<String, dynamic>> sendSms(
     List<String> receivers,
     String message,
   ) async {
-    try {
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/api/send-sms'),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode({'receivers': receivers, 'message': message}),
-          )
-          .timeout(_shortTimeout);
-      if (response.statusCode == 200) {
-        return Map<String, dynamic>.from(
-          json.decode(utf8.decode(response.bodyBytes)),
-        );
-      } else {
-        throw Exception('서버가 에러 코드를 반환했습니다: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('SMS 발송 요청 실패 (주소: $baseUrl). 상세: $e');
+    return _requestJsonMap(
+      http.post(
+        Uri.parse('$baseUrl/api/send-sms'),
+        headers: _jsonHeaders,
+        body: jsonEncode({'receivers': receivers, 'message': message}),
+      ),
+      timeout: _shortTimeout,
+      fallbackMessage: '문자를 보내지 못했어요. 보호자 번호와 인터넷 연결을 확인해 주세요.',
+    );
+  }
+
+  static Future<Map<String, dynamic>> _requestJsonMap(
+    Future<http.Response> request, {
+    required Duration timeout,
+    required String fallbackMessage,
+  }) async {
+    final data = await _requestJson(
+      request,
+      timeout: timeout,
+      fallbackMessage: fallbackMessage,
+    );
+    if (data is! Map) {
+      throw ApiException(fallbackMessage);
     }
+    return Map<String, dynamic>.from(data);
+  }
+
+  static Future<dynamic> _requestJson(
+    Future<http.Response> request, {
+    required Duration timeout,
+    String fallbackMessage = '서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.',
+  }) async {
+    try {
+      final response = await request.timeout(timeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiException(_serverMessage(response, fallbackMessage));
+      }
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException(fallbackMessage);
+    }
+  }
+
+  static Map<String, dynamic> _decodeMapResponse(
+    http.Response response,
+    String fallbackMessage,
+  ) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(_serverMessage(response, fallbackMessage));
+    }
+    try {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      if (data is Map) return Map<String, dynamic>.from(data);
+    } catch (_) {
+      // The caller receives the same simple, actionable message for malformed data.
+    }
+    throw ApiException(fallbackMessage);
+  }
+
+  static String _serverMessage(http.Response response, String fallbackMessage) {
+    try {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      if (data is Map && data['detail'] is String) {
+        final detail = (data['detail'] as String).trim();
+        if (detail.isNotEmpty && response.statusCode < 500) return detail;
+      }
+    } catch (_) {
+      // Ignore malformed server errors and show the user-friendly fallback.
+    }
+    return fallbackMessage;
+  }
+
+  static String _mimeTypeFor(String filename) {
+    final extension = filename.split('.').last.toLowerCase();
+    return switch (extension) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      'heic' => 'image/heic',
+      'heif' => 'image/heif',
+      _ => 'image/jpeg',
+    };
   }
 }
