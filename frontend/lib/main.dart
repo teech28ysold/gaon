@@ -3,9 +3,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:geolocator/geolocator.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
+import 'services/location_query_detector.dart';
+import 'services/location_service.dart';
 import 'widgets/gaon_card.dart';
 import 'widgets/gaon_chat_bubble.dart';
 import 'widgets/gaon_primary_button.dart';
@@ -66,6 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _picker = ImagePicker();
+  final LocationService _locationService = LocationService();
 
   // 4대 관심사 및 단축 질문 정의
   final List<Map<String, dynamic>> _shortcutCategories = [
@@ -269,32 +271,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // GPS 좌표 실시간 획득 헬퍼
-  Future<Position?> _getCurrentLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return null;
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return null;
-      }
-
-      if (permission == LocationPermission.deniedForever) return null;
-
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 4),
-        ),
-      );
-    } catch (e) {
-      debugPrint("위치 정보 획득 실패: $e");
-      return null;
-    }
-  }
-
   // 2. 메시지 전송
   Future<void> _sendMessage({String? customText}) async {
     final text = customText ?? _textController.text.trim();
@@ -321,25 +297,18 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
 
     // 위치 관련 단어가 들어가거나 주변 시설 조회를 원할 때만 GPS 정보 로드
-    Position? pos;
-    final bool isLocationQuery =
-        text.contains("주변") ||
-        text.contains("근처") ||
-        text.contains("병원") ||
-        text.contains("약국") ||
-        text.contains("날씨") ||
-        text.contains("등산") ||
-        text.contains("맛집") ||
-        text.contains("위치");
+    LocationResult? location;
+    final isLocationQuery = LocationQueryDetector.isLocationRelated(text);
     if (isLocationQuery) {
-      pos = await _getCurrentLocation();
+      location = await _locationService.getCurrentLocation();
+      _showLocationNotice(location);
     }
 
     try {
       final response = await ApiService.sendChatMessage(
         text,
-        latitude: pos?.latitude,
-        longitude: pos?.longitude,
+        latitude: location?.coordinates?.latitude,
+        longitude: location?.coordinates?.longitude,
       );
       if (response['status'] == 'success') {
         setState(() {
@@ -465,6 +434,64 @@ class _ChatScreenState extends State<ChatScreen> {
           textColor: Colors.white,
           onPressed: _loadHistory,
         ),
+      ),
+    );
+  }
+
+  void _showLocationNotice(LocationResult result) {
+    if (!mounted || (result.isSuccess && !result.usedCachedPosition)) return;
+
+    if (result.usedCachedPosition) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.userMessage,
+            style: const TextStyle(fontSize: 17, color: Colors.white),
+          ),
+          backgroundColor: Colors.orange.shade800,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.location_off_rounded, color: Colors.orange, size: 30),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '위치 확인이 필요합니다',
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          result.userMessage,
+          style: const TextStyle(fontSize: 18, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('나중에', style: TextStyle(fontSize: 17)),
+          ),
+          if (result.shouldOpenAppSettings || result.shouldOpenLocationSettings)
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _locationService.openSettings(result);
+              },
+              child: Text(
+                result.shouldOpenLocationSettings ? '위치 켜기' : '권한 설정',
+                style: const TextStyle(fontSize: 17),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1459,10 +1486,14 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final targetNames = _guardianNumbers.join(', ');
-    final position = await _getCurrentLocation();
-    final locationText = position == null
-        ? "현재 위치: 위치 확인이 되지 않았습니다. 전화로 위치를 확인해 주세요."
-        : "현재 위치: https://maps.google.com/?q=${position.latitude},${position.longitude}";
+    final location = await _locationService.getCurrentLocation();
+    _showLocationNotice(location);
+    final coordinates = location.coordinates;
+    final locationText = coordinates == null
+        ? "현재 위치: ${location.userMessage} 전화로 위치를 확인해 주세요."
+        : location.usedCachedPosition
+        ? "최근 확인 위치: https://maps.google.com/?q=${coordinates.latitude},${coordinates.longitude}"
+        : "현재 위치: https://maps.google.com/?q=${coordinates.latitude},${coordinates.longitude}";
 
     final smsContent =
         "[가온 택시도움] 부모님께서 택시 호출 도움을 요청하셨습니다.\n"

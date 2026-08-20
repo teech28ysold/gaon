@@ -26,6 +26,8 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSLocationUsageDescription</key>
+	<string>가온이 주변 정보와 택시 도움에 현재 위치를 사용합니다.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>
